@@ -1,0 +1,45 @@
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Data & Media files (Ignore raw videos and extracted tensors to comply with GitHub file limits)
+data/raw/*.mp4
+data/raw/*.avi
+data/raw/*.mkv
+data/raw/*.mov
+data/processed/*.npy
+data/processed/*.pt
+
+# Output directories (Ignore generated frames, predictions, and output video clips)
+outputs/frames/*
+outputs/predictions/*
+outputs/highlights/*
+
+# Preserve directory structure with .gitkeep
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/annotations/.gitkeep
+!models/.gitkeep
+!outputs/frames/.gitkeep
+!outputs/predictions/.gitkeep
+!outputs/highlights/.gitkeep
+!notebooks/.gitkeep
+
+# PyTorch Model Checkpoints
+models/*.pth
+models/*.pt
+models/*.onnx
+
+# IDE & OS System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
