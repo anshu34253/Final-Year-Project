@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %}About - ViralShort AI{% endblock %}
+
+{% block extra_head %}
+<style>
+  .about-short-section {
+    padding: 8rem 0 5rem 0;
+  }
+
+  .about-hero-box {
+    text-align: center;
+    max-width: 760px;
+    margin: 0 auto 3.5rem auto;
+  }
+
+  .about-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 1rem;
+    background: rgba(108, 76, 241, 0.07);
+    border: 1px solid rgba(123, 92, 255, 0.22);
+    border-radius: var(--radius-full);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--primary-purple);
+    margin-bottom: 1.25rem;
+  }
+
+  .about-title {
+    font-size: clamp(2.2rem, 4vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 1rem;
+  }
+
+  .about-sub {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+  }
+
+  /* Mission & Stats Card */
+  .mission-compact-card {
+    background: white;
+    border-radius: 24px;
+    padding: 2.5rem;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-md);
+    margin-bottom: 3rem;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-light);
+    text-align: center;
+  }
+
+  .stat-item .val {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    font-weight: 800;
+    background: var(--purple-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+    margin-bottom: 0.35rem;
+  }
+
+  .stat-item .lbl {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  /* 3 AI Model Cards */
+  .ai-models-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .model-card {
+    background: white;
+    border-radius: 20px;
+    padding: 1.75rem;
+    border: 1px solid var(--border-light);
+    transition: var(--transition-normal);
+  }
+
+  .model-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--border-purple);
+    box-shadow: var(--shadow-md);
+  }
+
+  .model-icon {
+    width: 44px;
+    height: 44px;
+    background: rgba(108, 76, 241, 0.08);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-purple);
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .model-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+  }
+
+  .model-desc {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* Compact Banner CTA */
+  .short-cta-banner {
+    background: var(--purple-gradient);
+    border-radius: 24px;
+    padding: 3rem 2rem;
+    text-align: center;
+    color: white;
+    box-shadow: var(--shadow-purple);
+  }
+
+  .cta-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: white;
+  }
+
+  .cta-desc {
+    font-size: 0.95rem;
+    opacity: 0.9;
+    margin-bottom: 1.75rem;
+  }
+
+  @media (max-width: 768px) {
+    .stats-row { grid-template-columns: 1fr; gap: 1rem; }
+    .ai-models-grid { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="about-short-section">
+  <div class="container-custom">
+    
+    <!-- Hero Box -->
+    <div class="about-hero-box">
+      <span class="about-badge">
+        <i class="bi bi-cpu-fill"></i> ViralShort AI Engine
+      </span>
+      <h1 class="about-title">
+        Automating Short-Form Video with <span class="gradient-text">Artificial Intelligence</span>
+      </h1>
+      <p class="about-sub">
+        ViralShort AI converts long-form podcasts and videos into high-converting 9:16 vertical shorts automatically in under 30 seconds.
+      </p>
+    </div>
+
+    <!-- Mission & Key Stats Card -->
+    <div class="mission-compact-card">
+      <h2 class="font-extrabold text-xl mb-2">Our Mission</h2>
+      <p class="text-muted text-sm leading-relaxed mb-0">
+        Finding engaging 30-second clips, cropping faces to 9:16, and adding styled subtitles manually takes 3+ hours per video. <strong>ViralShort AI</strong> automates this workflow using state-of-the-art computer vision and speech recognition, empowering creators and agencies to scale 10x faster.
+      </p>
+
+      <div class="stats-row">
+        <div class="stat-item">
+          <div class="val">95%</div>
+          <div class="lbl">Viral Detection Accuracy</div>
+        </div>
+        <div class="stat-item">
+          <div class="val">&lt;30s</div>
+          <div class="lbl">Average Processing Time</div>
+        </div>
+        <div class="stat-item">
+          <div class="val">100%</div>
+          <div class="lbl">Automated Workflow</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 Core AI Models -->
+    <h2 class="font-extrabold text-xl mb-3 text-center">Core AI Technology Stack</h2>
+    <div class="ai-models-grid">
+      <!-- Whisper -->
+      <div class="model-card">
+        <div class="model-icon"><i class="bi bi-mic-fill"></i></div>
+        <h3 class="model-title">OpenAI Whisper v3</h3>
+        <p class="model-desc">Provides 99.1% accurate word-level timestamps for sentence-level hook detection and styled subtitles.</p>
+      </div>
+
+      <!-- MediaPipe -->
+      <div class="model-card">
+        <div class="model-icon"><i class="bi bi-person-bounding-box"></i></div>
+        <h3 class="model-title">MediaPipe Face Mesh</h3>
+        <p class="model-desc">Detects speaker face landmarks at 30fps to dynamically re-frame landscape videos into 9:16 vertical shorts.</p>
+      </div>
+
+      <!-- XGBoost -->
+      <div class="model-card">
+        <div class="model-icon"><i class="bi bi-diagram-3-fill"></i></div>
+        <h3 class="model-title">XGBoost Viral Model</h3>
+        <p class="model-desc">Scores acoustic pitch variance and semantic hooks to isolate top viral moments with maximum retention.</p>
+      </div>
+    </div>
+
+    <!-- CTA Banner -->
+    <div class="short-cta-banner">
+      <h2 class="cta-title">Ready to Transform Your Long Videos?</h2>
+      <p class="cta-desc">Start generating viral shorts in seconds with our AI-powered Flask backend.</p>
+      <a href="{{ url_for('upload') }}" class="btn-secondary-white py-2.5 px-4 font-bold">
+        <i class="bi bi-sparkles text-purple me-1"></i> Try ViralShort AI Free
+      </a>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

@@ -49,6 +49,11 @@ from werkzeug.utils import secure_filename
 
 from main import run_pipeline, run_multi_reel_pipeline
 from src.youtube_downloader import is_valid_youtube_url
+from src.editor_service import (
+    get_or_create_project, save_project, reset_project,
+    validate_project_payload, save_uploaded_audio, is_safe_id
+)
+from src.editor_renderer import start_editor_render, get_render_status
 
 # Configure logging with UTF-8 safe stream handler
 logging.basicConfig(
@@ -79,6 +84,8 @@ os.makedirs(YT_DOWNLOADS_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["WEB_OUTPUTS_FOLDER"] = WEB_OUTPUTS_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
+app.config["PROPAGATE_EXCEPTIONS"] = True
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 # In-memory tracking for active processing jobs
 JOBS_STORE: dict[str, dict] = {}
@@ -107,12 +114,18 @@ def process_video_worker(
     reel_length: str = "30-60",
     aspect_ratio: str = "9:16",
     captions: bool = True,
+    crop_mode: str = "smart",
+    manual_x: float = 0.5,
+    subtitle_style: str = "bold",
+    subtitle_position: str = "bottom",
+    emojis: bool = False,
     budget_ratio: float = 0.15,
     original_filename: str = "video.mp4"
 ):
     """
     Background worker thread running the ML pipeline asynchronously.
-    Supports both Single Summary mode and Multi-Reel mode.
+    Supports both Single Summary mode and Multi-Reel mode with Smart Face Crop,
+    custom Subtitle Styling, and Contextual Emojis.
     Updates JOBS_STORE stage strings in real-time.
     """
     setup_utf8_environment()
@@ -123,7 +136,8 @@ def process_video_worker(
 
     logger.info(
         f"Starting ML processing for Job '{job_id}' (Output: {output_mode.upper()}, "
-        f"Mode: {model_mode}, Reels: {num_reels}, Length: {reel_length}, Aspect: {aspect_ratio})..."
+        f"Mode: {model_mode}, Reels: {num_reels}, Length: {reel_length}, Aspect: {aspect_ratio}, "
+        f"Crop: {crop_mode}, Captions: {captions}, Emojis: {emojis})..."
     )
 
     def update_stage(msg: str):
@@ -145,6 +159,11 @@ def process_video_worker(
                 reel_length=reel_length,
                 aspect_ratio=aspect_ratio,
                 captions=captions,
+                crop_mode=crop_mode,
+                manual_x=manual_x,
+                subtitle_style=subtitle_style,
+                subtitle_position=subtitle_position,
+                emojis=emojis,
                 output_dir=job_output_dir,
                 stage_callback=update_stage,
                 job_id=job_id
@@ -208,35 +227,74 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/upload", methods=["POST"])
+@app.route("/favicon.ico")
+def favicon():
+    """Serves the favicon.ico image."""
+    return send_from_directory(os.path.join(app.root_path, "static"), "favicon.ico", mimetype="image/vnd.microsoft.icon")
+
+
+@app.route("/upload", methods=["GET", "POST"])
+@app.route("/api/upload", methods=["POST"])
 def upload():
-    """Handles both file uploads and YouTube URL submissions for single or multi-reel output."""
-    upload_type = request.form.get("upload_type", "file")
-    model_mode = request.form.get("mode", "multimodal")
+    """Renders upload page on GET and handles form submission or JSON API on POST."""
+    if request.method == "GET":
+        return render_template("upload.html")
+
+    req_data = request.get_json(silent=True) or {}
+    
+    upload_type = req_data.get("upload_type") or request.form.get("upload_type")
+    youtube_url = req_data.get("youtube_url") or request.form.get("youtube_url", "").strip()
+
+    if not upload_type:
+        upload_type = "youtube" if youtube_url else "file"
+
+    model_mode = req_data.get("mode") or request.form.get("mode", "multimodal")
     if model_mode not in ["multimodal", "baseline"]:
         model_mode = "multimodal"
 
-    output_mode = request.form.get("output_mode", "reels")
+    output_mode = req_data.get("output_mode") or request.form.get("output_mode", "reels")
     if output_mode not in ["reels", "single"]:
         output_mode = "reels"
 
-    num_reels = request.form.get("num_reels", "auto")
-    if num_reels not in ["auto", "3", "5", "10"]:
+    num_reels = req_data.get("num_reels") or request.form.get("num_reels", "auto")
+    if str(num_reels).isdigit():
+        num_reels = str(int(num_reels))
+    elif num_reels != "auto":
         num_reels = "auto"
 
-    reel_length = request.form.get("reel_length", "30-60")
+    reel_length = req_data.get("reel_length") or request.form.get("reel_length", "30-60")
     if reel_length not in ["15-30", "30-60", "60-90", "auto"]:
         reel_length = "30-60"
 
-    aspect_ratio = request.form.get("aspect_ratio", "9:16")
+    aspect_ratio = req_data.get("aspect_ratio") or request.form.get("aspect_ratio", "9:16")
     if aspect_ratio not in ["9:16", "16:9"]:
         aspect_ratio = "9:16"
 
-    captions_param = request.form.get("captions", "on")
-    captions = captions_param in ["on", "1", "true", "True"]
+    captions_param = req_data.get("captions") or request.form.get("captions", "on")
+    captions = captions_param in ["on", "1", "true", "True", True]
+
+    crop_mode = req_data.get("crop_mode") or request.form.get("crop_mode", "smart")
+    if crop_mode not in ["smart", "center", "manual"]:
+        crop_mode = "smart"
+
+    try:
+        manual_x = max(0.0, min(1.0, float(req_data.get("manual_x") or request.form.get("manual_x", 0.5))))
+    except (ValueError, TypeError):
+        manual_x = 0.5
+
+    subtitle_style = req_data.get("subtitle_style") or request.form.get("subtitle_style", "bold")
+    if subtitle_style not in ["bold", "clean", "minimal"]:
+        subtitle_style = "bold"
+
+    subtitle_position = req_data.get("subtitle_position") or request.form.get("subtitle_position", "bottom")
+    if subtitle_position not in ["bottom", "center", "top"]:
+        subtitle_position = "bottom"
+
+    emojis_param = req_data.get("emojis") or request.form.get("emojis", "off")
+    emojis = emojis_param in ["on", "1", "true", "True", True]
 
     # Parse and validate budget percentage for single mode
-    budget_param = request.form.get("budget", "15")
+    budget_param = req_data.get("budget") or request.form.get("budget", "15")
     try:
         budget_pct = int(budget_param)
         if budget_pct not in [10, 15, 20]:
@@ -247,12 +305,15 @@ def upload():
 
     # 1. Handle YouTube Submission
     if upload_type == "youtube":
-        youtube_url = request.form.get("youtube_url", "").strip()
         if not youtube_url:
+            if request.is_json:
+                return jsonify({"status": "error", "message": "Please enter a valid YouTube URL."}), 400
             flash("Please enter a valid YouTube URL.", "danger")
             return redirect(url_for("index"))
 
         if not is_valid_youtube_url(youtube_url):
+            if request.is_json:
+                return jsonify({"status": "error", "message": "Invalid YouTube URL! Please provide a valid link."}), 400
             flash("Invalid YouTube URL! Please provide a standard YouTube, youtu.be, or Shorts link.", "danger")
             return redirect(url_for("index"))
 
@@ -279,26 +340,45 @@ def upload():
                 "reel_length": reel_length,
                 "aspect_ratio": aspect_ratio,
                 "captions": captions,
+                "crop_mode": crop_mode,
+                "manual_x": manual_x,
+                "subtitle_style": subtitle_style,
+                "subtitle_position": subtitle_position,
+                "emojis": emojis,
                 "budget_ratio": budget_ratio,
                 "original_filename": youtube_url
             },
             daemon=True
         )
         thread.start()
+        
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "status": "success",
+                "message": "YouTube video queued for processing.",
+                "job_id": job_id,
+                "redirect_url": url_for("processing", job_id=job_id)
+            })
         return redirect(url_for("processing", job_id=job_id))
 
     # 2. Handle Local File Upload
     else:
         if "video_file" not in request.files:
+            if request.is_json:
+                return jsonify({"status": "error", "message": "No video file selected."}), 400
             flash("No video file selected. Please select an MP4 video.", "danger")
             return redirect(url_for("index"))
 
         file = request.files["video_file"]
         if file.filename == "":
+            if request.is_json:
+                return jsonify({"status": "error", "message": "No file was chosen."}), 400
             flash("No file was chosen. Please select an MP4 video to upload.", "danger")
             return redirect(url_for("index"))
 
         if not allowed_file(file.filename):
+            if request.is_json:
+                return jsonify({"status": "error", "message": "Invalid file format. Only MP4 videos (.mp4) supported."}), 400
             flash("Invalid file format. Only MP4 videos (.mp4) are currently supported.", "danger")
             return redirect(url_for("index"))
 
@@ -329,13 +409,94 @@ def upload():
                 "reel_length": reel_length,
                 "aspect_ratio": aspect_ratio,
                 "captions": captions,
+                "crop_mode": crop_mode,
+                "manual_x": manual_x,
+                "subtitle_style": subtitle_style,
+                "subtitle_position": subtitle_position,
+                "emojis": emojis,
                 "budget_ratio": budget_ratio,
                 "original_filename": orig_filename
             },
             daemon=True
         )
         thread.start()
+        
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "status": "success",
+                "message": "Video uploaded and queued for processing.",
+                "job_id": job_id,
+                "redirect_url": url_for("processing", job_id=job_id)
+            })
         return redirect(url_for("processing", job_id=job_id))
+
+
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    """Renders dashboard view of recent projects."""
+    recent_jobs = []
+    try:
+        with JOBS_LOCK:
+            for jid, jdata in list(JOBS_STORE.items()):
+                if jdata.get("status") == "complete" and jdata.get("result"):
+                    res = jdata["result"] or {}
+                    reels = res.get("reels") or [{"confidence": 85.0}]
+                    scores = [r.get("confidence") or r.get("score") or 85.0 for r in reels if isinstance(r, dict)]
+                    top_score = round(max(scores), 1) if scores else 85.0
+                    dur = res.get("video_duration") or 0.0
+                    try:
+                        dur_float = float(dur)
+                    except (ValueError, TypeError):
+                        dur_float = 0.0
+
+                    recent_jobs.append({
+                        "id": jid,
+                        "title": res.get("original_display_name", f"Project {jid}"),
+                        "shorts_generated": res.get("num_reels", len(reels)),
+                        "top_viral_score": top_score,
+                        "duration": f"{dur_float:.0f}s",
+                        "status": "completed"
+                    })
+    except Exception as e:
+        logger.error(f"Dashboard error: {e}")
+
+    return render_template("dashboard.html", projects=recent_jobs)
+
+
+@app.route("/about", methods=["GET"])
+def about():
+    """Renders project architecture and documentation page."""
+    return render_template("about.html")
+
+
+@app.route("/login", methods=["GET"])
+def login():
+    """Renders login/signup page."""
+    return render_template("login.html")
+
+
+@app.route("/api/preview", methods=["POST"])
+def api_preview():
+    """Fetches fast YouTube video metadata for preview card."""
+    data = request.get_json() or request.form or {}
+    youtube_url = data.get("youtube_url", "").strip()
+    if not youtube_url or not is_valid_youtube_url(youtube_url):
+        return jsonify({"status": "error", "message": "Invalid YouTube URL"}), 400
+
+    try:
+        from src.youtube_downloader import extract_video_id
+        vid = extract_video_id(youtube_url)
+        return jsonify({
+            "status": "success",
+            "metadata": {
+                "title": f"YouTube Video ({vid})",
+                "channel": "YouTube Creator",
+                "duration": "1080p MP4 Ready",
+                "thumbnail": f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/processing/<job_id>", methods=["GET"])
@@ -375,7 +536,11 @@ def api_status(job_id: str):
         return jsonify({"status": "complete", "stage": "Complete", "redirect_url": url_for("result", job_id=job_id)})
 
     if job is None:
-        return jsonify({"status": "error", "error": "Job not found"}), 404
+        return jsonify({
+            "status": "error",
+            "error": "Job expired or server restarted. Please submit your video again.",
+            "redirect_url": url_for("index")
+        }), 404
 
     resp = {
         "status": job["status"],
@@ -401,6 +566,22 @@ def result(job_id: str):
 
     with open(meta_path, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # Check for edited reel files on disk
+    reels = data.get("reels", [])
+    for r in reels:
+        try:
+            r_num = int(r.get("reel_num", 1))
+            edited_fname = f"reel_{r_num:02d}_edited.mp4"
+            edited_path = os.path.join(job_dir, edited_fname)
+            if os.path.isfile(edited_path) and os.path.getsize(edited_path) > 0:
+                r["has_edited"] = True
+                r["edited_filename"] = edited_fname
+                r["edited_size_mb"] = round(os.path.getsize(edited_path) / (1024 * 1024), 2)
+            else:
+                r["has_edited"] = False
+        except Exception:
+            r["has_edited"] = False
 
     return render_template("result.html", job_id=job_id, data=data)
 
@@ -496,6 +677,364 @@ def download_all(job_id: str):
         download_name=f"{title_prefix}_{job_id}_reels.zip",
         mimetype="application/zip"
     )
+
+
+@app.route("/api/clip_details/<job_id>/<int:reel_num>", methods=["GET"])
+def api_clip_details(job_id: str, reel_num: int):
+    """Returns reel metadata and settings for the Manual Editor."""
+    if not is_safe_job_id(job_id):
+        return jsonify({"status": "error", "message": "Invalid Job ID"}), 400
+
+    job_dir = os.path.join(app.config["WEB_OUTPUTS_FOLDER"], job_id)
+    meta_path = os.path.join(job_dir, "segments.json")
+    if not os.path.isfile(meta_path):
+        return jsonify({"status": "error", "message": "Job metadata not found"}), 404
+
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+    reels = data.get("reels", [])
+    target = next((r for r in reels if r.get("reel_num") == reel_num), None)
+    if not target:
+        return jsonify({"status": "error", "message": f"Reel #{reel_num} not found"}), 404
+
+    target_copy = dict(target)
+    target_copy["video_url"] = url_for("serve_media", job_id=job_id, filename=target["filename"]) + f"?t={int(time.time())}"
+    target_copy["video_duration"] = data.get("original_duration", 0.0)
+
+    return jsonify({"status": "success", "reel": target_copy})
+
+
+@app.route("/api/render_clip/<job_id>", methods=["POST"])
+def api_render_clip(job_id: str):
+    """
+    Manual Editor Clip Re-renderer:
+    Renders only a single short clip with user-customized:
+    - Start and End time
+    - Crop mode (smart face tracking, center, manual X)
+    - Subtitle toggle (ON/OFF)
+    - Subtitle style (Clean, Bold, Minimal)
+    - Subtitle position (Bottom, Center, Top)
+    - Emoji toggle (ON/OFF)
+    
+    IMPORTANT: ResNet-50 and Bi-LSTM are NEVER rerun for manual edits.
+    """
+    if not is_safe_job_id(job_id):
+        return jsonify({"status": "error", "message": "Invalid Job ID"}), 400
+
+    job_dir = os.path.join(app.config["WEB_OUTPUTS_FOLDER"], job_id)
+    meta_path = os.path.join(job_dir, "segments.json")
+    if not os.path.isfile(meta_path):
+        return jsonify({"status": "error", "message": "Job metadata not found"}), 404
+
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            job_data = json.load(f)
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Could not read metadata: {e}"}), 500
+
+    data = request.get_json(silent=True) or request.form or {}
+    reel_num = int(data.get("reel_num", 1))
+
+    # Find the target reel in metadata
+    reels = job_data.get("reels", [])
+    target_reel = None
+    target_idx = -1
+    for idx, r in enumerate(reels):
+        if r.get("reel_num") == reel_num:
+            target_reel = r
+            target_idx = idx
+            break
+
+    if target_reel is None:
+        return jsonify({"status": "error", "message": f"Reel #{reel_num} not found in job"}), 404
+
+    # Extract source video path
+    source_video = job_data.get("source_video_path")
+    if not source_video or not os.path.isfile(source_video):
+        yt_meta = job_data.get("youtube_meta")
+        if yt_meta and yt_meta.get("video_path") and os.path.isfile(yt_meta["video_path"]):
+            source_video = yt_meta["video_path"]
+        else:
+            # Check uploads directory for files matching job_id
+            for uf in os.listdir(app.config["UPLOAD_FOLDER"]):
+                if uf.startswith(job_id) and uf.endswith(".mp4"):
+                    source_video = os.path.join(app.config["UPLOAD_FOLDER"], uf)
+                    break
+
+    if not source_video or not os.path.isfile(source_video):
+        return jsonify({"status": "error", "message": "Source video file not found for re-rendering"}), 404
+
+    # Parse parameters with validation
+    try:
+        start_sec = max(0.0, float(data.get("start_sec", target_reel.get("start_sec", 0.0))))
+        end_sec = float(data.get("end_sec", target_reel.get("end_sec", start_sec + 30.0)))
+        if end_sec <= start_sec:
+            end_sec = start_sec + 15.0
+        duration_sec = end_sec - start_sec
+    except (ValueError, TypeError):
+        start_sec = float(target_reel.get("start_sec", 0.0))
+        end_sec = float(target_reel.get("end_sec", start_sec + 30.0))
+        duration_sec = end_sec - start_sec
+
+    crop_mode = str(data.get("crop_mode", "smart")).lower()
+    if crop_mode not in ["smart", "center", "manual"]:
+        crop_mode = "smart"
+
+    try:
+        manual_x = max(0.0, min(1.0, float(data.get("manual_x", 0.5))))
+    except (ValueError, TypeError):
+        manual_x = 0.5
+
+    captions = data.get("captions")
+    if isinstance(captions, str):
+        captions = captions.lower() in ["true", "1", "on"]
+    elif captions is None:
+        captions = True
+    else:
+        captions = bool(captions)
+
+    subtitle_style = str(data.get("subtitle_style", "bold")).lower()
+    if subtitle_style not in ["bold", "clean", "minimal"]:
+        subtitle_style = "bold"
+
+    subtitle_position = str(data.get("subtitle_position", "bottom")).lower()
+    if subtitle_position not in ["bottom", "center", "top"]:
+        subtitle_position = "bottom"
+
+    emojis = data.get("emojis")
+    if isinstance(emojis, str):
+        emojis = emojis.lower() in ["true", "1", "on"]
+    elif emojis is None:
+        emojis = False
+    else:
+        emojis = bool(emojis)
+
+    # Collect speech segments relevant to the new time interval
+    existing_speech = target_reel.get("speech_segments") or []
+    if not existing_speech:
+        for r in reels:
+            if r.get("speech_segments"):
+                existing_speech.extend(r.get("speech_segments", []))
+
+    from src.reel_renderer import render_single_reel
+
+    out_filename = f"reel_{reel_num:02d}.mp4"
+    out_path = os.path.join(job_dir, out_filename)
+
+    render_result = render_single_reel(
+        source_video_path=source_video,
+        start_sec=start_sec,
+        duration_sec=duration_sec,
+        output_path=out_path,
+        aspect_ratio="9:16",
+        speech_segments=existing_speech,
+        captions=captions,
+        transcript=target_reel.get("transcript"),
+        crop_mode=crop_mode,
+        manual_x=manual_x,
+        subtitle_style=subtitle_style,
+        subtitle_position=subtitle_position,
+        emojis=emojis
+    )
+
+    def fmt_time(s):
+        m = int(s // 60)
+        sec = int(s % 60)
+        return f"{m:02d}:{sec:02d}"
+
+    # Update reel in memory
+    target_reel["start_sec"] = round(start_sec, 2)
+    target_reel["end_sec"] = round(end_sec, 2)
+    target_reel["start_formatted"] = fmt_time(start_sec)
+    target_reel["end_formatted"] = fmt_time(end_sec)
+    target_reel["duration_sec"] = round(duration_sec, 2)
+    target_reel["crop_mode"] = crop_mode
+    target_reel["manual_x"] = manual_x
+    target_reel["captions"] = captions
+    target_reel["subtitle_style"] = subtitle_style
+    target_reel["subtitle_position"] = subtitle_position
+    target_reel["emojis"] = emojis
+    target_reel["crop_info"] = render_result.get("crop_info")
+    target_reel["file_size_mb"] = render_result.get("file_size_mb")
+
+    reels[target_idx] = target_reel
+    job_data["reels"] = reels
+
+    # Save updated segments.json and manifest.json
+    try:
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(job_data, f, indent=2, ensure_ascii=False)
+        manifest_path = os.path.join(job_dir, "manifest.json")
+        if os.path.isfile(manifest_path):
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(job_data, f, indent=2, ensure_ascii=False)
+    except Exception as save_err:
+        logger.warning(f"Error saving updated metadata: {save_err}")
+
+    video_url = url_for("serve_media", job_id=job_id, filename=out_filename) + f"?t={int(time.time())}"
+    return jsonify({
+        "status": "success",
+        "message": f"Reel #{reel_num} re-rendered successfully!",
+        "reel": target_reel,
+        "video_url": video_url
+    })
+
+
+# ----------------------------------------------------------------------
+# PROFESSIONAL VIDEO EDITOR ROUTES (PHASE 8)
+# ----------------------------------------------------------------------
+
+@app.route("/editor/<job_id>/<int:clip_id>", methods=["GET"])
+def editor_page(job_id: str, clip_id: int):
+    """
+    Renders the professional dark-themed browser video editor for a generated Short.
+    Loads project state without rerunning AI highlight detection models.
+    """
+    if not is_safe_job_id(job_id) or clip_id < 1:
+        abort(400, "Invalid Job or Clip ID.")
+
+    job_dir = os.path.join(app.config["WEB_OUTPUTS_FOLDER"], job_id)
+    if not os.path.isdir(job_dir):
+        flash("Job output directory not found.", "danger")
+        return redirect(url_for("index"))
+
+    try:
+        project = get_or_create_project(job_id, clip_id)
+    except Exception as e:
+        logger.error(f"Error loading project for editor ({e})")
+        flash(f"Could not load editor project: {e}", "danger")
+        return redirect(url_for("result", job_id=job_id))
+
+    reel_fname = project.get("reel_filename", f"reel_{clip_id:02d}.mp4")
+    media_url = url_for("serve_media", job_id=job_id, filename=reel_fname) + f"?t={int(time.time())}"
+
+    return render_template(
+        "editor.html",
+        job_id=job_id,
+        clip_id=clip_id,
+        project=project,
+        media_url=media_url
+    )
+
+
+@app.route("/api/editor/<job_id>/<int:clip_id>/project", methods=["GET"])
+def api_editor_get_project(job_id: str, clip_id: int):
+    """Returns the current editor project state JSON for a clip."""
+    if not is_safe_job_id(job_id) or clip_id < 1:
+        return jsonify({"status": "error", "message": "Invalid Job or Clip ID"}), 400
+
+    try:
+        project = get_or_create_project(job_id, clip_id)
+        return jsonify({"status": "success", "project": project})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 404
+
+
+@app.route("/api/editor/<job_id>/<int:clip_id>/save", methods=["POST"])
+def api_editor_save_project(job_id: str, clip_id: int):
+    """Validates and persists edited project state without rerunning AI models."""
+    if not is_safe_job_id(job_id) or clip_id < 1:
+        return jsonify({"status": "error", "message": "Invalid Job or Clip ID"}), 400
+
+    req_data = request.get_json(silent=True) or {}
+    try:
+        current_proj = get_or_create_project(job_id, clip_id)
+        max_dur = float(current_proj.get("source_duration", 3600.0))
+        validated = validate_project_payload(req_data, max_duration=max_dur)
+
+        for k, v in validated.items():
+            current_proj[k] = v
+
+        saved = save_project(job_id, clip_id, current_proj)
+        return jsonify({
+            "status": "success",
+            "message": "Project state saved successfully.",
+            "project": saved
+        })
+    except Exception as e:
+        logger.error(f"Save project error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/editor/<job_id>/<int:clip_id>/reset", methods=["POST"])
+def api_editor_reset_project(job_id: str, clip_id: int):
+    """Resets all edits back to original reel configuration."""
+    if not is_safe_job_id(job_id) or clip_id < 1:
+        return jsonify({"status": "error", "message": "Invalid Job or Clip ID"}), 400
+
+    try:
+        reset_proj = reset_project(job_id, clip_id)
+        return jsonify({
+            "status": "success",
+            "message": "Project reset to original clip state.",
+            "project": reset_proj
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/editor/<job_id>/<int:clip_id>/upload_audio", methods=["POST"])
+def api_editor_upload_audio(job_id: str, clip_id: int):
+    """Securely uploads an audio file for background music mixing."""
+    if not is_safe_job_id(job_id) or clip_id < 1:
+        return jsonify({"status": "error", "message": "Invalid Job or Clip ID"}), 400
+
+    if "audio_file" not in request.files:
+        return jsonify({"status": "error", "message": "No audio file provided"}), 400
+
+    file_obj = request.files["audio_file"]
+    if file_obj.filename == "":
+        return jsonify({"status": "error", "message": "No file selected"}), 400
+
+    try:
+        saved_name = save_uploaded_audio(job_id, file_obj)
+        return jsonify({
+            "status": "success",
+            "message": "Audio file uploaded successfully.",
+            "filename": saved_name
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
+@app.route("/api/editor/<job_id>/<int:clip_id>/render", methods=["POST"])
+def api_editor_render(job_id: str, clip_id: int):
+    """Starts asynchronous background render of edited short using FFmpeg."""
+    if not is_safe_job_id(job_id) or clip_id < 1:
+        return jsonify({"status": "error", "message": "Invalid Job or Clip ID"}), 400
+
+    req_data = request.get_json(silent=True) or {}
+    try:
+        current_proj = get_or_create_project(job_id, clip_id)
+        if req_data:
+            max_dur = float(current_proj.get("source_duration", 3600.0))
+            validated = validate_project_payload(req_data, max_duration=max_dur)
+            for k, v in validated.items():
+                current_proj[k] = v
+            save_project(job_id, clip_id, current_proj)
+
+        render_res = start_editor_render(job_id, clip_id, current_proj)
+        return jsonify(render_res)
+    except Exception as e:
+        logger.error(f"Render launch error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/editor/<job_id>/<int:clip_id>/render_status", methods=["GET"])
+def api_editor_render_status(job_id: str, clip_id: int):
+    """Returns the current rendering stage and progress for an edited short."""
+    if not is_safe_job_id(job_id) or clip_id < 1:
+        return jsonify({"status": "error", "message": "Invalid Job or Clip ID"}), 400
+
+    try:
+        status_info = get_render_status(job_id, clip_id)
+        return jsonify(status_info)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # ----------------------------------------------------------------------

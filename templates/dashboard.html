@@ -1,0 +1,363 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - ViralShort AI{% endblock %}
+
+{% block extra_head %}
+<style>
+  .dash-wrapper {
+    padding: 8rem 0 6rem 0;
+  }
+
+  /* Metric Cards */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .metric-card {
+    background: white;
+    border-radius: 20px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-normal);
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .metric-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-purple);
+    box-shadow: var(--shadow-md);
+  }
+
+  .metric-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .metric-val {
+    font-family: var(--font-heading);
+    font-size: 1.85rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text-dark);
+  }
+
+  .metric-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+  }
+
+  .metric-trend {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 9999px;
+    margin-left: auto;
+  }
+
+  .trend-up {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+  }
+
+  /* Plan Quota Card */
+  .quota-card {
+    background: linear-gradient(135deg, rgba(108, 76, 241, 0.05) 0%, rgba(123, 92, 255, 0.1) 100%);
+    border: 1px solid rgba(123, 92, 255, 0.2);
+    border-radius: 20px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .quota-info {
+    flex: 1;
+    min-width: 240px;
+  }
+
+  .quota-progress-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(108, 76, 241, 0.15);
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-top: 0.6rem;
+  }
+
+  .quota-progress-fill {
+    height: 100%;
+    background: var(--purple-gradient);
+    border-radius: 9999px;
+  }
+
+  /* Project Table Card */
+  .table-card {
+    background: white;
+    border-radius: 24px;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .table-card-header {
+    padding: 1.5rem 1.75rem;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .table-search-input {
+    padding: 0.5rem 1rem 0.5rem 2.4rem;
+    border: 1px solid var(--border-light);
+    border-radius: 9999px;
+    font-size: 0.88rem;
+    outline: none;
+    transition: var(--transition-fast);
+    width: 240px;
+    background: var(--bg-secondary);
+  }
+
+  .table-search-input:focus {
+    border-color: var(--primary-purple);
+    background: white;
+  }
+
+  .custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  .custom-table th {
+    padding: 0.9rem 1.5rem;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .custom-table td {
+    padding: 1.1rem 1.5rem;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: middle;
+  }
+
+  .custom-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .custom-table tr:hover td {
+    background: rgba(108, 76, 241, 0.015);
+  }
+
+  .proj-thumb {
+    width: 72px;
+    height: 44px;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+  }
+
+  .viral-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.65rem;
+    background: rgba(245, 158, 11, 0.1);
+    color: #D97706;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+
+  .clips-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.65rem;
+    background: rgba(108, 76, 241, 0.08);
+    color: var(--primary-purple);
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+
+  @media (max-width: 768px) {
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+    .table-search-input { width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="dash-wrapper">
+  <div class="container-custom">
+    
+    <!-- Top Header -->
+    <div class="text-center mb-5">
+      <h1 class="font-extrabold text-3xl mb-2">Projects Dashboard</h1>
+      <p class="text-muted text-sm mb-4">Manage your processed videos, review viral clips, and download high-performing assets.</p>
+      <a href="{{ url_for('upload') }}" class="btn-primary-purple">
+        <i class="bi bi-cloud-plus-fill me-1"></i> Process New Video
+      </a>
+    </div>
+
+    <!-- 4 Key Metric Cards -->
+    <div class="metrics-grid">
+      <!-- Metric 1 -->
+      <div class="metric-card">
+        <div class="metric-icon" style="background: rgba(108, 76, 241, 0.1); color: var(--primary-purple);">
+          <i class="bi bi-film"></i>
+        </div>
+        <div>
+          <div class="metric-val">24</div>
+          <div class="metric-label">Videos Processed</div>
+        </div>
+        <span class="metric-trend trend-up">+12%</span>
+      </div>
+
+      <!-- Metric 2 -->
+      <div class="metric-card">
+        <div class="metric-icon" style="background: rgba(123, 92, 255, 0.1); color: #7B5CFF;">
+          <i class="bi bi-scissors"></i>
+        </div>
+        <div>
+          <div class="metric-val">108</div>
+          <div class="metric-label">Shorts Generated</div>
+        </div>
+        <span class="metric-trend trend-up">+28%</span>
+      </div>
+
+      <!-- Metric 3 -->
+      <div class="metric-card">
+        <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;">
+          <i class="bi bi-clock-history"></i>
+        </div>
+        <div>
+          <div class="metric-val">42 hrs</div>
+          <div class="metric-label">Editing Saved</div>
+        </div>
+      </div>
+
+      <!-- Metric 4 -->
+      <div class="metric-card">
+        <div class="metric-icon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;">
+          <i class="bi bi-fire"></i>
+        </div>
+        <div>
+          <div class="metric-val">96.2%</div>
+          <div class="metric-label">Avg Viral Score</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monthly Quota Card -->
+    <div class="quota-card text-center justify-content-center flex-column">
+      <div class="quota-info text-center">
+        <div class="d-flex align-items-center justify-content-center gap-3 mb-1">
+          <span class="font-bold text-sm text-dark"><i class="bi bi-lightning-charge-fill text-purple me-1"></i> Pro Plan Quota</span>
+          <span class="font-bold text-xs text-purple">24 / 50 Shorts Used</span>
+        </div>
+        <div class="quota-progress-track mx-auto">
+          <div class="quota-progress-fill" style="width: 48%;"></div>
+        </div>
+      </div>
+      <div class="d-flex gap-2 justify-content-center mt-3">
+        <a href="{{ url_for('upload') }}" class="btn-secondary-white py-2 px-3 text-xs">
+          <i class="bi bi-arrow-clockwise me-1"></i> Quota Resets in 12 Days
+        </a>
+      </div>
+    </div>
+
+    <!-- Projects Table Card -->
+    <div class="table-card">
+      <div class="table-card-header">
+        <div class="d-flex align-items-center gap-2">
+          <h3 class="font-bold text-lg mb-0"><i class="bi bi-collection-play me-2 text-purple"></i> Recent Video Projects</h3>
+          <span class="badge bg-light text-dark border font-semibold">{{ projects|length }} projects</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+          <!-- Search Bar -->
+          <div style="position: relative;">
+            <i class="bi bi-search" style="position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.85rem;"></i>
+            <input type="text" class="table-search-input" placeholder="Search projects...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Body -->
+      <div style="overflow-x: auto;">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Video Project</th>
+              <th>Original Duration</th>
+              <th>Generated Shorts</th>
+              <th>Top Viral Score</th>
+              <th>Processed Date</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for proj in projects %}
+            <tr>
+              <td>
+                <div class="d-flex align-items-center gap-3">
+                  <img src="{{ proj.thumbnail }}" alt="Thumbnail" class="proj-thumb">
+                  <div>
+                    <div class="font-bold text-dark mb-0.5" style="line-height: 1.3;">{{ proj.title }}</div>
+                    <div class="text-xs text-muted"><i class="bi bi-link-45deg me-1"></i> {{ proj.original_url }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="text-muted font-medium text-xs"><i class="bi bi-clock me-1"></i> {{ proj.duration }}</span>
+              </td>
+              <td>
+                <span class="clips-badge"><i class="bi bi-scissors me-1"></i> {{ proj.shorts_generated }} shorts</span>
+              </td>
+              <td>
+                <span class="viral-badge"><i class="bi bi-fire me-0.5"></i> {{ proj.top_viral_score }}%</span>
+              </td>
+              <td>
+                <span class="text-muted text-xs"><i class="bi bi-calendar3 me-1"></i> {{ proj.created_at }}</span>
+              </td>
+              <td style="text-align: right;">
+                <a href="{{ url_for('result', id=proj.id) }}" class="btn-primary-purple py-1.5 px-3 text-xs" style="display: inline-flex;">
+                  View Shorts <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

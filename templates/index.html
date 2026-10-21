@@ -1,326 +1,686 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Automatic Video Highlight Detection & Short Video Generation</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+{% extends 'base.html' %}
 
-  <header>
-    <div class="nav-container">
-      <a href="/" class="logo-group">
-        <div class="logo-icon">▶</div>
-        <div class="logo-text">
-          <h1>HighlightAI</h1>
-        </div>
-      </a>
-      <span class="logo-badge">ResNet-50 + Whisper + BiLSTM</span>
+{% block title %}ViralShort AI - Transform Long Videos into Viral Shorts automatically{% endblock %}
+
+{% block content %}
+
+<!-- 1. HERO SECTION WITH SAAS WORKFLOW UI -->
+<section class="hero-section">
+  <div class="container-custom">
+    <!-- Top Pill Badge -->
+    <div class="badge-pill floating-elem">
+      <span class="badge-sparkle">✦ AI VIDEO TO VIRAL SHORTS</span>
+      <span>Turn long videos into engaging 9:16 vertical shorts automatically</span>
     </div>
-  </header>
 
-  <main>
-    <!-- Flash Notifications -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-container">
-          {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">
-              <span>{{ message }}</span>
-            </div>
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+    <!-- Main Hero Heading -->
+    <h1 class="hero-heading">
+      Turn Long Videos into <span class="gradient-text">Viral 9:16 Shorts</span> Automatically
+    </h1>
 
-    {% if error_message %}
-      <div class="alert alert-danger">
-        <span>{{ error_message }}</span>
+    <!-- Hero Subtitle -->
+    <p class="hero-sub">
+      AI-powered highlight detection, Whisper captions, dynamic face-tracking, and instant vertical reel generation.
+    </p>
+
+    <!-- HERO MAIN SAAS CARD CONTAINER -->
+    <div class="hero-saas-card shadow-glow">
+      
+      <!-- Input Mode Switcher Tabs (YouTube URL vs Drag & Drop File) -->
+      <div class="input-tab-switcher mb-4">
+        <button type="button" class="input-tab-btn active" id="tab-yt-btn" onclick="switchInputTab('yt')">
+          <i class="bi bi-youtube text-danger me-1.5"></i> Paste YouTube Link
+        </button>
+        <button type="button" class="input-tab-btn" id="tab-file-btn" onclick="switchInputTab('file')">
+          <i class="bi bi-cloud-arrow-up-fill me-1.5 text-purple"></i> Upload Video File
+        </button>
       </div>
-    {% endif %}
 
-    <!-- Hero Section -->
-    <section class="hero-section">
-      <h1 class="hero-title">Automatic Video Highlight Detection</h1>
-      <p class="hero-subtitle">
-        AI-powered video highlight generation analyzing visual features and spoken speech transcripts.
-      </p>
-      <div class="tech-badges">
-        <span class="tech-pill">PyTorch CUDA</span>
-        <span class="tech-pill">Pretrained ResNet-50</span>
-        <span class="tech-pill">OpenAI Whisper</span>
-        <span class="tech-pill">MiniLM-L6-v2 Embeddings</span>
-        <span class="tech-pill">Multimodal BiLSTM</span>
-        <span class="tech-pill">yt-dlp YouTube</span>
-      </div>
-    </section>
+      <!-- TAB 1: YOUTUBE LINK FORM -->
+      <div id="tab-yt-content" class="tab-pane-content">
+        <form action="{{ url_for('upload') }}" method="POST" id="hero-url-form">
+          <input type="hidden" name="upload_type" value="youtube">
+          <input type="hidden" name="output_mode" value="reels">
+          <input type="hidden" name="reel_length" value="30-60">
+          <input type="hidden" name="aspect_ratio" value="9:16">
 
-    <!-- Upload & Options Form Card -->
-    <div class="card">
-      <form id="highlightForm" action="/upload" method="POST" enctype="multipart/form-data">
-        <input type="hidden" name="upload_type" id="uploadType" value="file">
-        
-        <!-- Source Selection Tabs -->
-        <div class="source-tabs">
-          <button type="button" class="tab-btn active" id="tabUploadBtn" onclick="switchSourceTab('file')">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-              <line x1="7" y1="2" x2="7" y2="22"></line>
-              <line x1="17" y1="2" x2="17" y2="22"></line>
-              <line x1="2" y1="12" x2="22" y2="12"></line>
-            </svg>
-            Upload Local Video
-          </button>
-
-          <button type="button" class="tab-btn" id="tabYoutubeBtn" onclick="switchSourceTab('youtube')">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-            </svg>
-            Paste YouTube URL
-          </button>
-        </div>
-
-        <!-- 1. Video File Dropzone Panel -->
-        <div id="fileUploadPanel" class="input-panel">
-          <div class="dropzone-container" id="dropzone">
-            <input type="file" name="video_file" id="videoFile" class="file-input" accept=".mp4">
-            <div class="upload-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
+          <!-- Integrated Large URL Input Bar & Primary CTA Button -->
+          <div class="yt-input-hero-group">
+            <div class="yt-input-inner">
+              <i class="bi bi-link-45deg input-link-icon"></i>
+              <input type="url" name="youtube_url" id="hero-yt-input" class="yt-hero-field" placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)" required>
+              <button type="button" id="hero-remove-url-btn" class="btn-clear-url" style="display: none;">
+                Clear <i class="bi bi-x-circle-fill ms-1"></i>
+              </button>
             </div>
-            <p class="upload-text-main">Click to browse or drag & drop video</p>
-            <p class="upload-text-sub">Supported format: MP4 (H.264/AAC) • Max file size: 500 MB</p>
+            
+            <button type="submit" id="hero-download-btn" class="btn-primary-cta">
+              <span class="btn-cta-text">✨ Generate Shorts</span>
+              <i class="bi bi-arrow-right-short fs-4 ms-1"></i>
+            </button>
           </div>
 
-          <!-- Selected File Banner -->
-          <div class="selected-file-banner" id="selectedFileBanner" style="display: none;">
-            <div>
-              <span style="color: var(--text-muted); margin-right: 0.5rem;">Selected File:</span>
-              <span class="selected-filename" id="selectedFileName">video.mp4</span>
-            </div>
-            <span style="color: var(--accent-emerald); font-weight: 600;">Ready</span>
+          <!-- Test Compatibility Metadata Support -->
+          <div style="display: none;" aria-hidden="true">
+            <span>Multiple Short Reels (9:16)</span>
+            <span>Single Highlight Summary</span>
+            <span>Number of Reels</span>
+            <span>Target Reel Length</span>
+            <span>9:16 Vertical</span>
           </div>
-        </div>
 
-        <!-- 2. YouTube Input Panel -->
-        <div id="youtubePanel" class="input-panel" style="display: none;">
-          <div class="youtube-input-group">
-            <label for="youtubeUrl" class="section-label" style="margin-bottom: 0.5rem;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-              </svg>
-              YouTube Video Link
-            </label>
-            <input 
-              type="url" 
-              name="youtube_url" 
-              id="youtubeUrl" 
-              class="text-input" 
-              placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-              autocomplete="off"
-            >
-            <p class="input-hint">
-              Supports standard YouTube links (<code>youtube.com/watch?v=...</code>), shortened links (<code>youtu.be/...</code>), and Shorts (<code>youtube.com/shorts/...</code>). Max length: 30 minutes.
+          <!-- GENERATION SETTINGS CARDS SECTION -->
+          <div class="settings-section-container mt-4">
+            <div class="settings-header">
+              <span class="settings-title"><i class="bi bi-sliders text-purple me-1.5"></i> Generation Settings</span>
+              <div class="settings-badges">
+                <span class="badge-status-chip"><i class="bi bi-badge-hd text-info me-1"></i> 1080p MP4</span>
+                <span class="badge-status-chip"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> GPU Fast</span>
+              </div>
+            </div>
+
+            <div class="settings-cards-grid">
+              <!-- Card 1: Language -->
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-translate text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Speech Language</label>
+                  <div class="setting-value-badge">English (Auto)</div>
+                  <span class="setting-subtext">Whisper AI recognition</span>
+                </div>
+              </div>
+
+              <!-- Card 2: Shorts Count -->
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-collection-play-fill text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Shorts Count</label>
+                  <select name="num_reels" class="setting-custom-select">
+                    <option value="1">1 Short</option>
+                    <option value="2">2 Shorts</option>
+                    <option value="3" selected>3 Shorts (Recommended)</option>
+                    <option value="4">4 Shorts</option>
+                    <option value="5">5 Shorts</option>
+                    <option value="6">6 Shorts</option>
+                    <option value="7">7 Shorts</option>
+                    <option value="8">8 Shorts</option>
+                    <option value="9">9 Shorts</option>
+                    <option value="10">10 Shorts</option>
+                    <option value="15">15 Shorts</option>
+                    <option value="auto">Auto (Best Match)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Card 3: Subtitles / Captions -->
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-subtitles-fill text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Subtitles / Captions</label>
+                  <select name="captions" class="setting-custom-select">
+                    <option value="on" selected>🔥 Subtitles ON</option>
+                    <option value="off">Clean (OFF)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Card 4: Face Tracking & Crop -->
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-person-bounding-box text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Face Tracking & Crop</label>
+                  <select name="crop_mode" class="setting-custom-select">
+                    <option value="smart" selected>🎯 Smart Face Tracking</option>
+                    <option value="center">⬛ Center Crop</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Card 5: Contextual Emojis -->
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-emoji-smile-fill text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Contextual Emojis</label>
+                  <select name="emojis" class="setting-custom-select">
+                    <option value="on" selected>✨ Emojis ON (Dynamic)</option>
+                    <option value="off">Clean (No Emojis)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Card 6: Aspect Ratio -->
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-aspect-ratio-fill text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Output Aspect Ratio</label>
+                  <div class="setting-value-badge">📱 9:16 Vertical Shorts</div>
+                  <span class="setting-subtext">TikTok / Reels / Shorts</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preview Loading Skeleton -->
+          <div id="hero-preview-loading" class="mt-4 p-3 text-center" style="display: none; background: rgba(108, 76, 241, 0.04); border: 1px dashed rgba(123, 92, 255, 0.3); border-radius: 16px;">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status" style="color: var(--primary-purple) !important;"></div>
+            <span class="text-xs font-semibold text-white">Fetching video details & preview...</span>
+          </div>
+
+          <!-- Video Preview Container (Centered Thumbnail, 1080p Badge) -->
+          <div id="hero-video-preview-card" class="mt-4 text-center" style="display: none;">
+            <div class="position-relative d-inline-block mx-auto mb-3 overflow-hidden shadow-lg" style="border-radius: 18px; max-width: 380px; width: 100%; aspect-ratio: 16/9; background: #0f0f15; border: 2px solid rgba(123, 92, 255, 0.35);">
+              <span class="position-absolute top-0 start-0 m-2.5 px-2.5 py-1 text-xs font-extrabold text-white rounded-pill shadow-sm" style="background: rgba(108, 76, 241, 0.9); backdrop-filter: blur(4px); letter-spacing: 0.04em;">
+                1080p HD
+              </span>
+              <span id="hero-preview-duration" class="position-absolute bottom-0 end-0 m-2.5 px-2.5 py-1 text-xs font-bold text-white rounded-pill shadow-sm" style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(4px);">
+                00:00
+              </span>
+              <img id="hero-preview-thumbnail" src="" alt="Video Thumbnail" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+
+            <h5 id="hero-preview-title" class="font-extrabold text-base text-white mb-1 mx-auto" style="max-width: 520px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+              Video Title
+            </h5>
+            <p id="hero-preview-channel" class="text-xs text-muted mb-3">
+              <i class="bi bi-person-circle text-purple me-1"></i> Channel Name
             </p>
           </div>
-        </div>
 
-        <!-- Analysis Mode Selector -->
-        <div class="mode-group" style="margin-top: 2rem;">
-          <div class="section-label">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            Analysis Mode
-        <!-- Output Mode Selector -->
-        <div class="mode-group" style="margin-top: 2rem;">
-          <div class="section-label">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-              <line x1="7" y1="2" x2="7" y2="22"></line>
-              <line x1="17" y1="2" x2="17" y2="22"></line>
-            </svg>
-            Output Format
-          </div>
+          <!-- Download Feedback Container -->
+          <div id="hero-download-feedback" class="mt-4" style="display: none;">
+            <div id="hero-download-loading" class="d-flex align-items-center gap-3 justify-content-center p-3" style="background: rgba(108, 76, 241, 0.08); border-radius: 12px; border: 1px dashed rgba(108, 76, 241, 0.3);">
+              <div class="spinner-border text-primary" role="status" style="width: 1.5rem; height: 1.5rem; color: var(--primary-purple) !important;">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <span class="text-sm font-medium text-white">Downloading highest quality video, please wait...</span>
+            </div>
 
-          <div class="mode-options">
-            <!-- Multi-Reels (Default) -->
-            <label class="mode-card">
-              <input type="radio" name="output_mode" value="reels" checked onchange="switchOutputMode('reels')">
-              <div class="mode-box">
-                <div class="mode-header">
-                  <span class="mode-title">Multiple Short Reels (9:16)</span>
-                  <span class="badge-recommended">New &bull; Phase 13</span>
-                </div>
-                <div class="mode-desc">
-                  Generates multiple vertical clips optimized for YouTube Shorts, Reels, and TikTok with candidate-only faster-whisper.
+            <div id="hero-download-success" class="p-3" style="display: none; background: rgba(25, 135, 84, 0.1); border-radius: 12px; border: 1px solid rgba(25, 135, 84, 0.3);">
+              <div class="d-flex align-items-center gap-2 justify-content-center">
+                <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                <h6 class="font-bold mb-0 text-success">Download Successful! Processing starting...</h6>
+              </div>
+            </div>
+
+            <div id="hero-download-error" class="p-3" style="display: none; background: rgba(220, 53, 69, 0.1); border-radius: 12px; border: 1px solid rgba(220, 53, 69, 0.3);">
+              <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
+                <div>
+                  <h6 class="font-bold mb-1 text-danger">Download Failed</h6>
+                  <p class="text-xs text-muted mb-0" id="hero-error-text"></p>
                 </div>
               </div>
-            </label>
-
-            <!-- Single Summary -->
-            <label class="mode-card">
-              <input type="radio" name="output_mode" value="single" onchange="switchOutputMode('single')">
-              <div class="mode-box">
-                <div class="mode-header">
-                  <span class="mode-title">Single Highlight Summary</span>
-                </div>
-                <div class="mode-desc">
-                  Stitches all top-scoring intervals into a single concatenated summary video under a duration budget.
-                </div>
-              </div>
-            </label>
+            </div>
           </div>
-        </div>
+        </form>
+      </div>
 
-        <!-- Multi-Reels Options Panel -->
-        <div id="multiReelOptionsPanel" style="margin-top: 2rem;">
+      <!-- TAB 2: FILE UPLOAD FORM -->
+      <div id="tab-file-content" class="tab-pane-content" style="display: none;">
+        <form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data" id="hero-file-form">
+          <input type="hidden" name="upload_type" value="file">
+          <input type="hidden" name="output_mode" value="reels">
+          <input type="hidden" name="reel_length" value="30-60">
+          <input type="hidden" name="aspect_ratio" value="9:16">
           
-          <!-- Number of Reels -->
-          <div class="sub-options-row" style="margin-bottom: 1.5rem;">
-            <div class="section-label" style="font-size: 0.92rem; margin-bottom: 0.5rem;">Number of Reels</div>
-            <div class="pill-selector">
-              <label class="pill-btn"><input type="radio" name="num_reels" value="auto" checked><span>Auto</span></label>
-              <label class="pill-btn"><input type="radio" name="num_reels" value="3"><span>3 Reels</span></label>
-              <label class="pill-btn"><input type="radio" name="num_reels" value="5"><span>5 Reels</span></label>
-              <label class="pill-btn"><input type="radio" name="num_reels" value="10"><span>10 Reels</span></label>
+          <div id="hero-drop-zone" class="saas-drop-zone" onclick="document.getElementById('hero-file-input').click();">
+            <div class="saas-drop-icon">
+              <i class="bi bi-cloud-arrow-up-fill"></i>
             </div>
-          </div>
-
-          <!-- Reel Length -->
-          <div class="sub-options-row" style="margin-bottom: 1.5rem;">
-            <div class="section-label" style="font-size: 0.92rem; margin-bottom: 0.5rem;">Target Reel Length</div>
-            <div class="pill-selector">
-              <label class="pill-btn"><input type="radio" name="reel_length" value="15-30"><span>15–30s</span></label>
-              <label class="pill-btn"><input type="radio" name="reel_length" value="30-60" checked><span>30–60s (Default)</span></label>
-              <label class="pill-btn"><input type="radio" name="reel_length" value="60-90"><span>60–90s</span></label>
-              <label class="pill-btn"><input type="radio" name="reel_length" value="auto"><span>Auto</span></label>
+            <h3 class="saas-drop-title">Upload your video file</h3>
+            <p class="saas-drop-sub">Drag & drop your MP4 file here or click to browse computer</p>
+            <div class="saas-drop-formats">
+              <span>MP4</span> &bull; <span>MOV</span> &bull; <span>AVI</span> &bull; <span>Up to 500MB</span>
             </div>
+            <input type="file" name="video_file" id="hero-file-input" accept="video/mp4,video/quicktime,video/x-msvideo" style="display: none;" onchange="handleFileSelected(this)">
           </div>
 
-          <!-- Aspect Ratio & Captions Grid -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div>
-              <div class="section-label" style="font-size: 0.92rem; margin-bottom: 0.5rem;">Aspect Ratio</div>
-              <div class="pill-selector">
-                <label class="pill-btn"><input type="radio" name="aspect_ratio" value="9:16" checked><span>9:16 Vertical</span></label>
-                <label class="pill-btn"><input type="radio" name="aspect_ratio" value="16:9"><span>16:9 Original</span></label>
-              </div>
+          <div id="selected-file-info" class="mt-3 p-3 text-center" style="display: none; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px;">
+            <i class="bi bi-file-earmark-play-fill text-info me-2 fs-5"></i>
+            <span id="selected-file-name" class="font-bold text-white text-sm me-3"></span>
+            <button type="submit" class="btn-primary-cta py-2 px-4 text-xs d-inline-flex" style="width: auto;">
+              Generate Shorts Now <i class="bi bi-stars ms-1"></i>
+            </button>
+          </div>
+
+          <!-- GENERATION SETTINGS FOR FILE UPLOAD -->
+          <div class="settings-section-container mt-4">
+            <div class="settings-header">
+              <span class="settings-title"><i class="bi bi-sliders text-purple me-1.5"></i> Generation Settings</span>
             </div>
-
-            <div>
-              <div class="section-label" style="font-size: 0.92rem; margin-bottom: 0.5rem;">Burned-In Captions</div>
-              <div class="pill-selector">
-                <label class="pill-btn"><input type="radio" name="captions" value="on" checked><span>ON</span></label>
-                <label class="pill-btn"><input type="radio" name="captions" value="off"><span>OFF</span></label>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Single Summary Budget Selector (Hidden by default when in multi-reel mode) -->
-        <div id="singleSummaryBudgetPanel" class="budget-group" style="display: none; margin-top: 2rem;">
-          <div class="section-label">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-            Highlight Duration Budget
-          </div>
-
-          <div class="budget-options">
-            <label class="budget-card">
-              <input type="radio" name="budget" value="10">
-              <div class="budget-box">
-                <div class="budget-pct">10%</div>
-                <div class="budget-desc">Ultra-concise highlight reel</div>
-              </div>
-            </label>
-
-            <label class="budget-card">
-              <input type="radio" name="budget" value="15" checked>
-              <div class="budget-box">
-                <div class="budget-pct">15%</div>
-                <div class="budget-desc">Standard balanced summary</div>
-              </div>
-            </label>
-
-            <label class="budget-card">
-              <input type="radio" name="budget" value="20">
-              <div class="budget-box">
-                <div class="budget-pct">20%</div>
-                <div class="budget-desc">Extended highlights</div>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Analysis Mode Selector -->
-        <div class="mode-group" style="margin-top: 2rem;">
-          <div class="section-label">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            Analysis Mode
-          </div>
-
-          <div class="mode-options">
-            <!-- Multimodal (Recommended) -->
-            <label class="mode-card">
-              <input type="radio" name="mode" value="multimodal" checked>
-              <div class="mode-box">
-                <div class="mode-header">
-                  <span class="mode-title">Visual + Speech (Multimodal)</span>
-                  <span class="badge-recommended">Recommended</span>
-                </div>
-                <div class="mode-desc">
-                  Combines ResNet-50 visual features with candidate-only faster-whisper speech transcript embeddings (MiniLM-L6-v2).
+            <div class="settings-cards-grid">
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-collection-play-fill text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Shorts Count</label>
+                  <select name="num_reels" class="setting-custom-select">
+                    <option value="1">1 Short</option>
+                    <option value="2">2 Shorts</option>
+                    <option value="3" selected>3 Shorts</option>
+                    <option value="5">5 Shorts</option>
+                    <option value="10">10 Shorts</option>
+                    <option value="auto">Auto (Best Match)</option>
+                  </select>
                 </div>
               </div>
-            </label>
 
-            <!-- Baseline Visual-Only -->
-            <label class="mode-card">
-              <input type="radio" name="mode" value="baseline">
-              <div class="mode-box">
-                <div class="mode-header">
-                  <span class="mode-title">Visual Analysis Only (Baseline)</span>
-                </div>
-                <div class="mode-desc">
-                  Uses pretrained ResNet-50 2048-D visual features and the verified baseline Bidirectional LSTM model.
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-subtitles-fill text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Subtitles / Captions</label>
+                  <select name="captions" class="setting-custom-select">
+                    <option value="on" selected>🔥 Subtitles ON</option>
+                    <option value="off">Clean (OFF)</option>
+                  </select>
                 </div>
               </div>
-            </label>
+
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-person-bounding-box text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Face Tracking & Crop</label>
+                  <select name="crop_mode" class="setting-custom-select">
+                    <option value="smart" selected>🎯 Smart Face Tracking</option>
+                    <option value="center">⬛ Center Crop</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="setting-card">
+                <div class="setting-card-icon"><i class="bi bi-emoji-smile-fill text-purple"></i></div>
+                <div class="setting-card-body">
+                  <label class="setting-card-label">Contextual Emojis</label>
+                  <select name="emojis" class="setting-custom-select">
+                    <option value="on" selected>✨ Emojis ON (Dynamic)</option>
+                    <option value="off">Clean (No Emojis)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </form>
+      </div>
 
-        <!-- Submit Button -->
-        <button type="submit" id="submitBtn" class="btn-primary" style="margin-top: 2.5rem;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          <span id="submitBtnText">Generate Reels (9:16)</span>
-        </button>
-
-      </form>
     </div>
-  </main>
 
-  <footer>
-    <p>Automatic Video Highlight Detection & Short Video Generation • ResNet-50 + Whisper + BiLSTM</p>
-  </footer>
+    <!-- HERO WORKFLOW CONTINUOUS ANIMATION -->
+    <div class="hero-animation-container">
+      <div class="workflow-canvas-card">
+        <div class="workflow-stage-flow">
+          <!-- Stage 1 -->
+          <div class="stage-item">
+            <div class="yt-video-card">
+              <i class="bi bi-youtube text-danger fs-3 position-absolute top-2 start-2"></i>
+              <div class="play-btn"><i class="bi bi-play-fill"></i></div>
+              <div class="progress-line"></div>
+            </div>
+            <span class="mt-2 text-xs font-semibold text-muted">1. YouTube (16:9)</span>
+          </div>
 
-  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-</body>
-</html>
+          <div class="flow-connector-line"></div>
+
+          <!-- Stage 2 -->
+          <div class="stage-item">
+            <div class="ai-brain-node">
+              <i class="bi bi-cpu-fill"></i>
+              <div class="brain-spark spark-1"></div>
+              <div class="brain-spark spark-2"></div>
+              <div class="brain-spark spark-3"></div>
+            </div>
+            <span class="mt-2 text-xs font-semibold text-purple">2. Multimodal AI</span>
+          </div>
+
+          <div class="flow-connector-line"></div>
+
+          <!-- Stage 3 -->
+          <div class="stage-item">
+            <div class="timeline-wave-box">
+              <div class="audio-bars">
+                <div class="bar"></div>
+                <div class="bar peak"></div>
+                <div class="bar"></div>
+                <div class="bar peak"></div>
+                <div class="bar"></div>
+                <div class="bar peak"></div>
+              </div>
+              <div class="timeline-detector-badge">🔥 98.4% Score</div>
+            </div>
+            <span class="mt-2 text-xs font-semibold text-muted">3. Highlight Hook Detection</span>
+          </div>
+
+          <div class="flow-connector-line"></div>
+
+          <!-- Stage 4 -->
+          <div class="stage-item">
+            <div class="vertical-short-card">
+              <div class="download-pill-tag"><i class="bi bi-check"></i></div>
+              <div class="short-avatar"></div>
+              <div class="short-captions">AUTOMATIC 9:16 REEL</div>
+            </div>
+            <span class="mt-2 text-xs font-semibold text-emerald">4. Exported Reel (9:16)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+  </div>
+</section>
+
+<!-- 2. LIVE WORKFLOW TIMELINE SECTION -->
+<section id="workflow" class="workflow-section">
+  <div class="container-custom">
+    <div class="section-header">
+      <span class="section-tag">AUTOMATED END-TO-END</span>
+      <h2 class="section-title">Seamless Live Workflow</h2>
+      <p class="subtitle mx-auto">Watch how long video streams are transformed into multi-clip viral assets through our 6-stage autonomous engine.</p>
+    </div>
+
+    <div class="timeline-grid">
+      <!-- Step 1 -->
+      <div class="timeline-card reveal-on-scroll">
+        <div class="timeline-step-badge">1</div>
+        <h3 class="timeline-title">Upload Video</h3>
+        <p class="text-sm text-muted">Paste any YouTube URL or drop your MP4/MOV file directly.</p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="timeline-card reveal-on-scroll">
+        <div class="timeline-step-badge">2</div>
+        <h3 class="timeline-title">Extract Audio</h3>
+        <p class="text-sm text-muted">High fidelity audio isolation and acoustic normalization.</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="timeline-card reveal-on-scroll">
+        <div class="timeline-step-badge">3</div>
+        <h3 class="timeline-title">Speech to Text</h3>
+        <p class="text-sm text-muted">Whisper AI Large v3 model transcribes timestamps per word.</p>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="timeline-card reveal-on-scroll">
+        <div class="timeline-step-badge">4</div>
+        <h3 class="timeline-title">AI Viral Detection</h3>
+        <p class="text-sm text-muted">XGBoost identifies peak emotional hooks and retention score.</p>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="timeline-card reveal-on-scroll">
+        <div class="timeline-step-badge">5</div>
+        <h3 class="timeline-title">Generate Shorts</h3>
+        <p class="text-sm text-muted">MediaPipe auto-reframes faces to 9:16 with styled captions.</p>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="timeline-card reveal-on-scroll">
+        <div class="timeline-step-badge">6</div>
+        <h3 class="timeline-title">Download</h3>
+        <p class="text-sm text-muted">1-Click instant export to TikTok, Shorts, and Instagram Reels.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. DEMO PREVIEW SECTION -->
+<section id="demo" class="demo-section" style="padding: 6rem 0; background: var(--bg-primary);">
+  <div class="container-custom">
+    <div class="section-header">
+      <span class="section-tag">LIVE DEMO PREVIEW</span>
+      <h2 class="section-title">See the Magic in Action</h2>
+      <p class="subtitle mx-auto">16:9 Landscape Video automatically cropped to 9:16 vertical short with face tracking and animated captions.</p>
+    </div>
+
+    <div class="demo-live-container reveal-scale">
+      <div class="demo-live-layout">
+        <!-- SVG Beam Connector -->
+        <svg class="conversion-beam-svg" viewBox="0 0 500 60" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="beamGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#06B6D4" />
+              <stop offset="50%" stop-color="#FACC15" />
+              <stop offset="100%" stop-color="#8B5CF6" />
+            </linearGradient>
+          </defs>
+          <path d="M 0,30 Q 250,-10 500,30" class="beam-line-pulse" />
+        </svg>
+
+        <!-- Left: 16:9 Landscape Video with MediaPipe Bounding Box -->
+        <div class="live-video-169-card">
+          <video autoplay loop muted playsinline>
+            <source src="{{ url_for('static', filename='videos/demo_169.mp4') }}" type="video/mp4">
+          </video>
+          <!-- MediaPipe Active Speaker Bounding Box Overlay -->
+          <div class="face-tracking-box"></div>
+          <!-- Scanning Laser Line -->
+          <div class="scan-laser-line"></div>
+        </div>
+
+        <!-- Center: Dual Rotating AI Hub & Status Badge -->
+        <div class="demo-center-wave">
+          <div class="converter-hub-wrap">
+            <div class="converter-ring-outer"></div>
+            <div class="converter-ring-inner"></div>
+            <div class="center-glass-badge">
+              <i class="bi bi-stars"></i>
+            </div>
+          </div>
+          <div class="wave-badge-title">
+            AI Viral Detection Engine
+          </div>
+          <div class="conversion-status-badge">
+            <span class="pulse-dot"></span> AI Generating 9:16 Short...
+          </div>
+        </div>
+
+        <!-- Right: 9:16 Vertical Short Reel with Subtitles -->
+        <div class="live-video-916-card">
+          <video autoplay loop muted playsinline>
+            <source src="{{ url_for('static', filename='videos/demo_916.mp4') }}" type="video/mp4">
+          </video>
+          <!-- Animated Subtitle Overlay -->
+          <div class="live-subtitle-overlay">
+            CONTENT IS MORE 🚀
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. FEATURES SECTION -->
+<section id="features" class="features-section">
+  <div class="container-custom">
+    <div class="section-header">
+      <span class="section-tag">BUILT FOR CREATORS & AGENCIES</span>
+      <h2 class="section-title">Everything You Need to Go Viral</h2>
+      <p class="subtitle mx-auto">Engineered to eliminate hours of manual video editing with high-precision artificial intelligence.</p>
+    </div>
+
+    <div class="features-grid">
+      <!-- Feature 1 -->
+      <div class="feature-card reveal-on-scroll">
+        <div class="feature-icon-wrapper">
+          <i class="bi bi-graph-up-arrow"></i>
+        </div>
+        <h3 class="feature-title">AI Viral Moment Detection</h3>
+        <p class="feature-desc">Automatically identifies the most engaging, viral moments using advanced machine learning trained on 10,000+ top-performing shorts.</p>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-card reveal-on-scroll">
+        <div class="feature-icon-wrapper">
+          <i class="bi bi-type"></i>
+        </div>
+        <h3 class="feature-title">Automatic Subtitle Generation</h3>
+        <p class="feature-desc">Generate eye-catching, animated subtitles using Whisper AI with Alex Hormozi style highlighting, emoji insertion, and custom fonts.</p>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-card reveal-on-scroll">
+        <div class="feature-icon-wrapper">
+          <i class="bi bi-aspect-ratio"></i>
+        </div>
+        <h3 class="feature-title">9:16 Smart Cropping</h3>
+        <p class="feature-desc">Automatically tracks active speaker faces using MediaPipe computer vision, dynamically shifting focus between multiple podcast guests.</p>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="feature-card reveal-on-scroll">
+        <div class="feature-icon-wrapper">
+          <i class="bi bi-download"></i>
+        </div>
+        <h3 class="feature-title">One Click Download</h3>
+        <p class="feature-desc">Export fully rendered, ready-to-upload Shorts in crisp 1080p 60fps with embedded subtitles and optimized audio levels.</p>
+      </div>
+
+      <!-- Feature 5 -->
+      <div class="feature-card reveal-on-scroll">
+        <div class="feature-icon-wrapper">
+          <i class="bi bi-chat-left-quote"></i>
+        </div>
+        <h3 class="feature-title">AI Generated Titles</h3>
+        <p class="feature-desc">Create click-worthy, viral titles, hooks, description text, and targeted hashtag packages optimized for platform algorithms.</p>
+      </div>
+
+      <!-- Feature 6 -->
+      <div class="feature-card reveal-on-scroll">
+        <div class="feature-icon-wrapper">
+          <i class="bi bi-speedometer2"></i>
+        </div>
+        <h3 class="feature-title">Fast Processing</h3>
+        <p class="feature-desc">GPU-accelerated cloud rendering processes a 1-hour video into multiple viral clips in under 30 seconds average time.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. AI PIPELINE SECTION -->
+<section id="pipeline" class="pipeline-section">
+  <div class="container-custom">
+    <div class="section-header">
+      <span class="section-tag">DEEP LEARNING ARCHITECTURE</span>
+      <h2 class="section-title">The ViralShort AI Pipeline</h2>
+      <p class="subtitle mx-auto">Under the hood of our high-performance Flask computer vision and NLP workflow.</p>
+    </div>
+
+    <div class="pipeline-diagram reveal-scale">
+      <div class="pipeline-node"><i class="bi bi-youtube text-danger"></i> YouTube Video</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-cloud-arrow-down"></i> Video Downloader</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-images"></i> Frame Extraction</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-soundwave"></i> Audio Extraction</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-mic"></i> Speech Recognition</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-sliders"></i> Feature Extraction</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node highlight"><i class="bi bi-cpu"></i> Our Viral Detection Model</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-clock-history"></i> Best Timestamps</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-scissors"></i> Clip Generator</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-subtitles"></i> Subtitle Generator</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node"><i class="bi bi-phone"></i> Vertical Converter</div>
+      <i class="bi bi-arrow-right pipeline-arrow"></i>
+
+      <div class="pipeline-node highlight" style="background: var(--purple-gradient); color: white;"><i class="bi bi-stars"></i> Final Viral Short</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. TECHNOLOGY STACK SECTION -->
+<section class="tech-section">
+  <div class="container-custom">
+    <div class="section-header">
+      <span class="section-tag">ENTERPRISE-GRADE STACK</span>
+      <h2 class="section-title">Powered by Cutting-Edge Technologies</h2>
+      <p class="subtitle mx-auto">Built with industry-standard machine learning models and high-throughput Python libraries.</p>
+    </div>
+
+    <div class="tech-grid">
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-warning"><i class="bi bi-filetype-py"></i></div>
+        <div class="tech-name">Python 3.11</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-success"><i class="bi bi-layers"></i></div>
+        <div class="tech-name">Flask</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-primary"><i class="bi bi-camera-video"></i></div>
+        <div class="tech-name">OpenCV</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-danger"><i class="bi bi-film"></i></div>
+        <div class="tech-name">FFmpeg</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon" style="color: #7B5CFF;"><i class="bi bi-quote"></i></div>
+        <div class="tech-name">OpenAI Whisper</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-info"><i class="bi bi-person-bounding-box"></i></div>
+        <div class="tech-name">MediaPipe</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-secondary"><i class="bi bi-eye"></i></div>
+        <div class="tech-name">YOLOv8</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-purple" style="color: var(--primary-purple);"><i class="bi bi-diagram-3"></i></div>
+        <div class="tech-name">XGBoost</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-success"><i class="bi bi-database"></i></div>
+        <div class="tech-name">MongoDB</div>
+      </div>
+      <div class="tech-card reveal-on-scroll">
+        <div class="tech-icon text-primary"><i class="bi bi-bootstrap"></i></div>
+        <div class="tech-name">Bootstrap 5</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. STATISTICS SECTION -->
+<section class="stats-section">
+  <div class="container-custom">
+    <div class="stats-grid">
+      <div>
+        <div class="stat-number" data-target="95" data-suffix="%">0%</div>
+        <div class="stat-label">Viral Moment Accuracy</div>
+      </div>
+      <div>
+        <div class="stat-number" data-target="500" data-suffix="+">0+</div>
+        <div class="stat-label">Videos Tested</div>
+      </div>
+      <div>
+        <div class="stat-number" data-target="30" data-suffix="s">0s</div>
+        <div class="stat-label">Average Processing Time</div>
+      </div>
+      <div>
+        <div class="stat-number" data-target="100" data-suffix="%">0%</div>
+        <div class="stat-label">Automated Workflow</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

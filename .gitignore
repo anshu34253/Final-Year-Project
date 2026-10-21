@@ -51,3 +51,9 @@ data/youtube_downloads/*
 Thumbs.db
 .vscode/
 .idea/
+
+# External subprojects and scratch bundles
+Face Detection/
+emoji/
+viral_shorts/
+

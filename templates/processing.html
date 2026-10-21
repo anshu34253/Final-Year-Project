@@ -1,109 +1,417 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Processing Video — HighlightAI</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+{% extends 'base.html' %}
 
-  <header>
-    <div class="nav-container">
-      <a href="/" class="logo-group">
-        <div class="logo-icon">▶</div>
-        <div class="logo-text">
-          <h1>HighlightAI</h1>
-        </div>
-      </a>
-      <span class="logo-badge">Processing Video</span>
-    </div>
-  </header>
+{% block title %}Processing your video... - ViralShort AI{% endblock %}
 
-  <main>
-    <div class="card processing-card" id="processingPoller" data-job-id="{{ job_id }}">
-      
-      <!-- Spinner -->
-      <div class="spinner-outer"></div>
+{% block extra_head %}
+<style>
+  .processing-wrapper-section {
+    padding: 6.5rem 0 5rem 0;
+    background: #0B132B;
+    min-height: 90vh;
+    color: #F8FAFC;
+  }
 
-      <h2 style="font-size: 1.75rem; font-weight: 800; margin-bottom: 0.5rem;">
-        Processing your video...
-      </h2>
-      <p id="stageStatusText" style="color: var(--accent-cyan); font-size: 1.05rem; font-weight: 500;">
-        Initializing pipeline...
+  .processing-header-title {
+    font-size: 2.25rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.02em;
+  }
+
+  .processing-active-stage {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #38BDF8;
+    margin-bottom: 2.25rem;
+    min-height: 1.6rem;
+    transition: all 0.3s ease;
+  }
+
+  /* 11 Steps List Container Card */
+  .steps-list-card {
+    background: #152238;
+    border: 1px solid rgba(56, 189, 248, 0.15);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    max-width: 660px;
+    margin: 0 auto 2.25rem auto;
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.45);
+  }
+
+  .step-row-item {
+    display: flex;
+    align-items: center;
+    gap: 1.15rem;
+    padding: 0.65rem 1rem;
+    border-radius: 12px;
+    margin-bottom: 0.2rem;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  /* Active Step Styling */
+  .step-row-item.active {
+    background: rgba(56, 189, 248, 0.08);
+    border-left: 3px solid #38BDF8;
+    box-shadow: inset 0 0 15px rgba(56, 189, 248, 0.05);
+  }
+
+  .step-icon-col {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Badge Number */
+  .step-num-circle {
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid #334155;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    transition: all 0.3s ease;
+  }
+
+  .step-label-text {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #475569;
+    transition: all 0.3s ease;
+    flex: 1;
+  }
+
+  /* Active Step Typography */
+  .step-row-item.active .step-label-text {
+    color: #38BDF8;
+    font-weight: 700;
+  }
+
+  /* Target Pulse Animation Icon */
+  .target-pulse-icon {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .target-pulse-icon::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #38BDF8;
+    animation: targetRipple 1.6s infinite ease-out;
+  }
+
+  .target-pulse-icon::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: #38BDF8;
+    border-radius: 50%;
+  }
+
+  @keyframes targetRipple {
+    0% { transform: scale(0.6); opacity: 1; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+
+  /* Completed Step */
+  .step-row-item.completed .step-label-text {
+    color: #94A3B8;
+    font-weight: 500;
+  }
+
+  .step-row-item.completed .step-icon-col {
+    color: #38BDF8;
+    font-size: 1.15rem;
+  }
+
+  /* Live Progress Track */
+  .overall-progress-bar-wrap {
+    max-width: 660px;
+    margin: 0 auto;
+  }
+
+  .progress-track-bg {
+    width: 100%;
+    height: 6px;
+    background: #1E293B;
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill-bar {
+    height: 100%;
+    width: 5%;
+    background: linear-gradient(90deg, #0284C7, #38BDF8);
+    border-radius: 99px;
+    transition: width 0.5s ease;
+  }
+
+  #error-banner {
+    display: none;
+    max-width: 660px;
+    margin: 0 auto 1.5rem auto;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 12px;
+    padding: 1rem;
+    color: #FCA5A5;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="processing-wrapper-section">
+  <div class="container-custom">
+    
+    <!-- Status Header -->
+    <div class="text-center">
+      <h1 class="processing-header-title">Processing your video...</h1>
+      <p id="active-stage-sub" class="processing-active-stage">
+        Getting YouTube video...
       </p>
+      <div id="error-banner" class="text-center font-semibold"></div>
+    </div>
 
-      <!-- Stage List (11 Real Processing Stages) -->
-      <div class="stage-list">
-        <div class="stage-item" id="stage-0">
-          <div class="stage-indicator">1</div>
-          <span>Getting YouTube video</span>
+    <!-- 11 Processing Steps List -->
+    <div class="steps-list-card">
+      
+      <!-- Step 1 -->
+      <div class="step-row-item active" id="step-row-1">
+        <div class="step-icon-col" id="step-icon-1">
+          <div class="target-pulse-icon"></div>
         </div>
-
-        <div class="stage-item" id="stage-1">
-          <div class="stage-indicator">2</div>
-          <span>Fast video analysis (ResNet-50)</span>
-        </div>
-
-        <div class="stage-item" id="stage-2">
-          <div class="stage-indicator">3</div>
-          <span>Detecting speech activity (RMS Energy)</span>
-        </div>
-
-        <div class="stage-item" id="stage-3">
-          <div class="stage-indicator">4</div>
-          <span>Finding candidate moments</span>
-        </div>
-
-        <div class="stage-item" id="stage-4">
-          <div class="stage-indicator">5</div>
-          <span>Transcribing selected moments (faster-whisper)</span>
-        </div>
-
-        <div class="stage-item" id="stage-5">
-          <div class="stage-indicator">6</div>
-          <span>Understanding candidate speech (MiniLM)</span>
-        </div>
-
-        <div class="stage-item" id="stage-6">
-          <div class="stage-indicator">7</div>
-          <span>Ranking important moments (Bi-LSTM)</span>
-        </div>
-
-        <div class="stage-item" id="stage-7">
-          <div class="stage-indicator">8</div>
-          <span>Creating multiple reels (Sentence-snapping & NMS)</span>
-        </div>
-
-        <div class="stage-item" id="stage-8">
-          <div class="stage-indicator">9</div>
-          <span>Converting to 9:16 (Center crop)</span>
-        </div>
-
-        <div class="stage-item" id="stage-9">
-          <div class="stage-indicator">10</div>
-          <span>Adding captions (Burned-in subtitles)</span>
-        </div>
-
-        <div class="stage-item" id="stage-10">
-          <div class="stage-indicator">11</div>
-          <span>Finalizing reels & manifest</span>
-        </div>
+        <span class="step-label-text" id="step-label-1">Getting YouTube video</span>
       </div>
 
-      <!-- Error Message Container -->
-      <div id="errorMessageContainer" style="display: none; margin-top: 2rem;"></div>
+      <!-- Step 2 -->
+      <div class="step-row-item" id="step-row-2">
+        <div class="step-icon-col" id="step-icon-2">
+          <div class="step-num-circle">2</div>
+        </div>
+        <span class="step-label-text" id="step-label-2">Fast video analysis (ResNet-50)</span>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-row-item" id="step-row-3">
+        <div class="step-icon-col" id="step-icon-3">
+          <div class="step-num-circle">3</div>
+        </div>
+        <span class="step-label-text" id="step-label-3">Detecting speech activity (RMS Energy)</span>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step-row-item" id="step-row-4">
+        <div class="step-icon-col" id="step-icon-4">
+          <div class="step-num-circle">4</div>
+        </div>
+        <span class="step-label-text" id="step-label-4">Finding candidate moments</span>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step-row-item" id="step-row-5">
+        <div class="step-icon-col" id="step-icon-5">
+          <div class="step-num-circle">5</div>
+        </div>
+        <span class="step-label-text" id="step-label-5">Transcribing selected moments (faster-whisper)</span>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="step-row-item" id="step-row-6">
+        <div class="step-icon-col" id="step-icon-6">
+          <div class="step-num-circle">6</div>
+        </div>
+        <span class="step-label-text" id="step-label-6">Understanding candidate speech (MiniLM)</span>
+      </div>
+
+      <!-- Step 7 -->
+      <div class="step-row-item" id="step-row-7">
+        <div class="step-icon-col" id="step-icon-7">
+          <div class="step-num-circle">7</div>
+        </div>
+        <span class="step-label-text" id="step-label-7">Ranking important moments (Bi-LSTM)</span>
+      </div>
+
+      <!-- Step 8 -->
+      <div class="step-row-item" id="step-row-8">
+        <div class="step-icon-col" id="step-icon-8">
+          <div class="step-num-circle">8</div>
+        </div>
+        <span class="step-label-text" id="step-label-8">Creating multiple reels (Sentence-snapping &amp; NMS)</span>
+      </div>
+
+      <!-- Step 9 -->
+      <div class="step-row-item" id="step-row-9">
+        <div class="step-icon-col" id="step-icon-9">
+          <div class="step-num-circle">9</div>
+        </div>
+        <span class="step-label-text" id="step-label-9">Converting to 9:16 (Center crop)</span>
+      </div>
+
+      <!-- Step 10 -->
+      <div class="step-row-item" id="step-row-10">
+        <div class="step-icon-col" id="step-icon-10">
+          <div class="step-num-circle">10</div>
+        </div>
+        <span class="step-label-text" id="step-label-10">Adding captions (Burned-in subtitles)</span>
+      </div>
+
+      <!-- Step 11 -->
+      <div class="step-row-item" id="step-row-11">
+        <div class="step-icon-col" id="step-icon-11">
+          <div class="step-num-circle">11</div>
+        </div>
+        <span class="step-label-text" id="step-label-11">Finalizing reels &amp; manifest</span>
+      </div>
 
     </div>
-  </main>
 
-  <footer>
-    <p>Automatic Video Highlight Detection & Short Video Generation • ResNet-50 + Whisper + BiLSTM</p>
-  </footer>
+    <!-- Progress Fill Bar -->
+    <div class="overall-progress-bar-wrap">
+      <div class="progress-track-bg">
+        <div id="progress-fill-bar" class="progress-fill-bar"></div>
+      </div>
+    </div>
 
-  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-</body>
-</html>
+  </div>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const jobId = "{{ job_id }}";
+  const activeStageSub = document.getElementById("active-stage-sub");
+  const errorBanner = document.getElementById("error-banner");
+  const progressFillBar = document.getElementById("progress-fill-bar");
+
+  let currentStepIndex = 1;
+
+  function determineStepIndex(stageText) {
+    if (!stageText) return currentStepIndex;
+    const txt = stageText.toLowerCase();
+
+    if (txt.includes("youtube") || txt.includes("getting") || txt.includes("download") || txt.includes("preparing")) return 1;
+    if (txt.includes("resnet") || txt.includes("fast video analysis") || txt.includes("visual")) return 2;
+    if (txt.includes("rms") || txt.includes("speech activity") || txt.includes("energy")) return 3;
+    if (txt.includes("candidate moments") || txt.includes("finding candidate")) return 4;
+    if (txt.includes("whisper") || txt.includes("transcribing")) return 5;
+    if (txt.includes("minilm") || txt.includes("understanding")) return 6;
+    if (txt.includes("bilstm") || txt.includes("bi-lstm") || txt.includes("ranking")) return 7;
+    if (txt.includes("sentence-snapping") || txt.includes("nms") || txt.includes("creating multiple")) return 8;
+    if (txt.includes("9:16") || txt.includes("center crop") || txt.includes("converting")) return 9;
+    if (txt.includes("captions") || txt.includes("subtitles") || txt.includes("adding captions")) return 10;
+    if (txt.includes("finalizing") || txt.includes("manifest") || txt.includes("complete")) return 11;
+
+    return currentStepIndex;
+  }
+
+  function updateStepUI(activeStepIndex, activeStageMessage) {
+    currentStepIndex = Math.max(currentStepIndex, activeStepIndex);
+
+    let downloadPct = null;
+    if (activeStageMessage) {
+      activeStageSub.textContent = activeStageMessage;
+      const match = activeStageMessage.match(/(\d+)%/);
+      if (match) {
+        downloadPct = parseInt(match[1]);
+      }
+    }
+
+    for (let i = 1; i <= 11; i++) {
+      const row = document.getElementById("step-row-" + i);
+      const iconCol = document.getElementById("step-icon-" + i);
+      if (!row || !iconCol) continue;
+
+      if (i < currentStepIndex) {
+        // Completed step: cyan checkmark
+        row.className = "step-row-item completed";
+        iconCol.innerHTML = '<i class="bi bi-check-circle-fill text-info fs-5"></i>';
+      } else if (i === currentStepIndex) {
+        // Active step: pulsing target icon & cyan glow
+        row.className = "step-row-item active";
+        iconCol.innerHTML = '<div class="target-pulse-icon"></div>';
+      } else {
+        // Pending step: grey number
+        row.className = "step-row-item";
+        iconCol.innerHTML = '<div class="step-num-circle">' + i + '</div>';
+      }
+    }
+
+    // Dynamically update Step 1 label with percentage badge if downloading
+    const step1Label = document.getElementById("step-label-1");
+    if (step1Label) {
+      if (currentStepIndex === 1 && downloadPct !== null) {
+        step1Label.innerHTML = 'Getting YouTube video <span class="badge ms-2" style="background: linear-gradient(135deg, #0284C7, #38BDF8); font-size: 0.82rem; padding: 0.3em 0.6em; border-radius: 8px; font-weight: 700; color: #ffffff;">' + downloadPct + '% Downloaded</span>';
+      } else if (currentStepIndex > 1) {
+        step1Label.textContent = "Getting YouTube video";
+      }
+    }
+
+    // Update progress bar
+    let pct = Math.min(100, Math.round((currentStepIndex / 11) * 100));
+    if (currentStepIndex === 1 && downloadPct !== null) {
+      pct = Math.max(3, Math.round((downloadPct / 100) * 9));
+    }
+    progressFillBar.style.width = pct + "%";
+  }
+
+  function pollStatus() {
+    fetch("/api/status/" + jobId)
+      .then(res => {
+        if (!res.ok && res.status === 404) {
+          errorBanner.style.display = "block";
+          errorBanner.innerHTML = 'Job expired or server restarted. <a href="/" class="text-info font-bold ms-1">Return Home to submit video</a>';
+          activeStageSub.textContent = "Job Expired or Server Restarted";
+          setTimeout(() => { window.location.href = "/"; }, 3500);
+          return null;
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (!data) return;
+
+        if (data.status === "error") {
+          errorBanner.style.display = "block";
+          errorBanner.textContent = data.error || "An error occurred during video processing.";
+          activeStageSub.textContent = "Processing Failed";
+          if (data.redirect_url) {
+            setTimeout(() => { window.location.href = data.redirect_url; }, 3000);
+          }
+          return;
+        }
+
+        const stepIdx = determineStepIndex(data.stage);
+        updateStepUI(stepIdx, data.stage);
+
+        if (data.status === "complete" || data.redirect_url) {
+          updateStepUI(11, "Complete! Loading shorts...");
+          setTimeout(() => {
+            window.location.href = data.redirect_url || ("/result/" + jobId);
+          }, 600);
+        } else {
+          setTimeout(pollStatus, 1500);
+        }
+      })
+      .catch(err => {
+        console.error("Status polling error:", err);
+        setTimeout(pollStatus, 2500);
+      });
+  }
+
+  pollStatus();
+});
+</script>
+{% endblock %}

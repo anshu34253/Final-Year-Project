@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Editor - Reel #{{ clip_id }} | VideoHighlightAI</title>
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="editor-body">
+
+  <!-- ========================================== -->
+  <!-- TOP HEADER NAVBAR                          -->
+  <!-- ========================================== -->
+  <header class="editor-navbar">
+    <div class="editor-nav-left">
+      <a href="{{ url_for('result', job_id=job_id) }}" class="editor-btn-secondary" title="Return to Generated Shorts Results">
+        <i class="bi bi-chevron-left"></i> Results
+      </a>
+      <div class="d-flex align-items-center gap-2 ms-2">
+        <span class="font-extrabold text-white text-sm">
+          {{ project.get('reel_filename', 'Reel Clip') }}
+        </span>
+        <span class="editor-pill-badge">Reel #{{ clip_id }}</span>
+        <span id="unsavedBadge" class="d-inline-flex align-items-center gap-1 text-xs text-warning" style="display: none;">
+          <span class="editor-unsaved-dot"></span> Unsaved
+        </span>
+      </div>
+    </div>
+
+    <!-- Center History & Reset Controls -->
+    <div class="editor-nav-center">
+      <button type="button" id="undoBtn" class="editor-btn-icon" title="Undo (Ctrl+Z)" disabled>
+        <i class="bi bi-arrow-counterclockwise"></i>
+      </button>
+      <button type="button" id="redoBtn" class="editor-btn-icon" title="Redo (Ctrl+Y)" disabled>
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+      <span style="color: rgba(255,255,255,0.15);">&verbar;</span>
+      <button type="button" id="resetBtn" class="editor-btn-secondary py-1 text-xs" title="Reset edits to original clip settings">
+        <i class="bi bi-arrow-repeat me-1 text-muted"></i> Reset
+      </button>
+    </div>
+
+    <!-- Right Action Buttons -->
+    <div class="editor-nav-right">
+      <button type="button" id="saveBtn" class="editor-btn-secondary" title="Save Project (Ctrl+S)">
+        <i class="bi bi-cloud-arrow-up me-1"></i> Save Project
+      </button>
+      <button type="button" id="renderFinalBtn" class="editor-btn-primary" title="Export High-Definition Final Short">
+        <i class="bi bi-magic me-1"></i> Render Final Video
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- MAIN WORKSPACE                             -->
+  <!-- ========================================== -->
+  <main class="editor-workspace">
+
+    <!-- 1. LEFT TOOL TABS SIDEBAR -->
+    <aside class="editor-tools-sidebar">
+      <button type="button" class="tool-tab-btn active" data-tool="trim" title="Trim & Split Video">
+        <i class="bi bi-scissors"></i>
+        <span>Trim</span>
+      </button>
+      <button type="button" class="tool-tab-btn" data-tool="crop" title="Aspect Ratio & Smart Face Cropping">
+        <i class="bi bi-aspect-ratio"></i>
+        <span>Crop</span>
+      </button>
+      <button type="button" class="tool-tab-btn" data-tool="subtitles" title="Subtitles & Burned Captions">
+        <i class="bi bi-chat-quote-fill"></i>
+        <span>Captions</span>
+      </button>
+      <button type="button" class="tool-tab-btn" data-tool="overlays" title="Text & Emoji Overlays">
+        <i class="bi bi-emoji-smile-fill"></i>
+        <span>Overlays</span>
+      </button>
+      <button type="button" class="tool-tab-btn" data-tool="audio" title="Audio Levels & Background Music">
+        <i class="bi bi-music-note-beamed"></i>
+        <span>Audio</span>
+      </button>
+      <button type="button" class="tool-tab-btn" data-tool="speed" title="Video Output Speed">
+        <i class="bi bi-speedometer2"></i>
+        <span>Speed</span>
+      </button>
+      <button type="button" class="tool-tab-btn" data-tool="adjustments" title="Brightness, Contrast & Filters">
+        <i class="bi bi-sliders2"></i>
+        <span>Filters</span>
+      </button>
+    </aside>
+
+    <!-- 2. CENTER STAGE VIDEO PREVIEW -->
+    <section class="editor-stage">
+      
+      <!-- Video Viewport Frame with Aspect Ratio Class -->
+      <div id="stageViewport" class="stage-viewport aspect-9-16">
+        
+        <!-- HTML5 Video Element -->
+        <video id="stageVideo" class="stage-video-element" playsinline loop preload="auto">
+          <source src="{{ media_url }}" type="video/mp4">
+        </video>
+
+        <!-- Interactive Crop Overlay Rule of Thirds -->
+        <div id="stageCropOverlay" class="stage-crop-overlay" style="display: none;">
+          <div></div><div></div><div></div>
+          <div></div><div></div><div></div>
+          <div></div><div></div><div></div>
+        </div>
+
+        <!-- Live Subtitle Overlay -->
+        <div id="stageSubtitleOverlay" class="stage-subtitle-overlay pos-bottom" style="display: none;">
+          <span id="subtitleTextBox" class="subtitle-text-box"></span>
+        </div>
+
+        <!-- Live Text & Emoji Overlays Layer -->
+        <div id="stageOverlaysContainer" class="stage-overlays-container"></div>
+      </div>
+
+      <!-- Playback Bar under Viewport -->
+      <div class="stage-playback-bar">
+        <button type="button" id="stepBackBtn" class="editor-btn-icon" title="Step -0.1s (Left Arrow)">
+          <i class="bi bi-skip-backward-fill"></i>
+        </button>
+        <button type="button" id="playPauseBtn" class="editor-btn-icon" style="color: #fff; width: 40px; height: 40px; background: rgba(123, 92, 255, 0.25);" title="Play / Pause (Space)">
+          <i class="bi bi-play-fill fs-5"></i>
+        </button>
+        <button type="button" id="stepFwdBtn" class="editor-btn-icon" title="Step +0.1s (Right Arrow)">
+          <i class="bi bi-skip-forward-fill"></i>
+        </button>
+
+        <span id="timeDisplay" class="playback-time-badge">00:00.0 / 00:30.0</span>
+
+        <span style="color: rgba(255,255,255,0.15);">&verbar;</span>
+
+        <!-- Volume & Mute -->
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" id="muteBtn" class="editor-btn-icon" style="width: 28px; height: 28px;" title="Mute Toggle">
+            <i class="bi bi-volume-up-fill"></i>
+          </button>
+          <input type="range" id="volumeSlider" class="editor-range" min="0" max="1" step="0.05" value="1" style="width: 70px;" title="Video Volume">
+        </div>
+
+        <span style="color: rgba(255,255,255,0.15);">&verbar;</span>
+
+        <!-- Fullscreen -->
+        <button type="button" id="fullscreenBtn" class="editor-btn-icon" style="width: 30px; height: 30px;" title="Fullscreen Preview">
+          <i class="bi bi-arrows-fullscreen"></i>
+        </button>
+      </div>
+
+    </section>
+
+    <!-- 3. RIGHT PROPERTIES PANEL -->
+    <aside class="editor-properties-panel">
+      <div class="panel-header">
+        <h3 id="currentPanelTitle" class="panel-title">Trim & Split</h3>
+        <span class="badge-status-chip" id="clipDurationBadge">30.0s</span>
+      </div>
+
+      <div class="panel-content">
+        
+        <!-- PANE: TRIM & SPLIT -->
+        <div id="pane_trim" class="tool-prop-pane">
+          <div class="prop-section mb-3">
+            <div class="prop-section-title">Clip Boundary Timestamps</div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="text-xs text-muted font-bold d-block mb-1">Start Time (sec)</label>
+                <input type="number" step="0.1" min="0" id="trimStartInput" class="editor-input">
+              </div>
+              <div class="col-6">
+                <label class="text-xs text-muted font-bold d-block mb-1">End Time (sec)</label>
+                <input type="number" step="0.1" min="0.5" id="trimEndInput" class="editor-input">
+              </div>
+            </div>
+            <button type="button" id="splitBtn" class="editor-btn-secondary w-100 justify-content-center py-2 text-xs font-bold">
+              <i class="bi bi-scissors text-purple me-1.5"></i> Split at Playhead
+            </button>
+          </div>
+          <div class="prop-section">
+            <div class="prop-section-title">Original Clip Reference</div>
+            <div class="text-xs text-muted">
+              <div>Original Start: <strong class="text-white">{{ project.original_clip.start_sec }}s</strong></div>
+              <div>Original End: <strong class="text-white">{{ project.original_clip.end_sec }}s</strong></div>
+              <div>Original Duration: <strong class="text-white">{{ project.original_clip.duration_sec }}s</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE: CROP & ASPECT RATIO -->
+        <div id="pane_crop" class="tool-prop-pane" style="display: none;">
+          <div class="prop-section mb-3">
+            <div class="prop-section-title">Aspect Ratio Presets</div>
+            <div class="aspect-selector-grid mb-2">
+              <button type="button" class="aspect-btn active" data-aspect="9:16">
+                <div class="aspect-box"></div>
+                <span>9:16</span>
+              </button>
+              <button type="button" class="aspect-btn" data-aspect="16:9">
+                <div class="aspect-box"></div>
+                <span>16:9</span>
+              </button>
+              <button type="button" class="aspect-btn" data-aspect="1:1">
+                <div class="aspect-box"></div>
+                <span>1:1</span>
+              </button>
+              <button type="button" class="aspect-btn" data-aspect="4:5">
+                <div class="aspect-box"></div>
+                <span>4:5</span>
+              </button>
+            </div>
+            <div class="text-xs text-muted text-center">9:16 optimized for TikTok, Shorts & Reels (1080×1920)</div>
+          </div>
+
+          <div class="prop-section mb-3">
+            <div class="prop-section-title">Cropping Strategy</div>
+            <div class="d-flex flex-column gap-2 mb-3">
+              <button type="button" class="editor-btn-secondary crop-mode-btn active" data-mode="smart">
+                <i class="bi bi-person-bounding-box text-purple"></i> Smart Face Tracking (AI)
+              </button>
+              <button type="button" class="editor-btn-secondary crop-mode-btn" data-mode="center">
+                <i class="bi bi-align-center"></i> Center Crop
+              </button>
+              <button type="button" class="editor-btn-secondary crop-mode-btn" data-mode="manual">
+                <i class="bi bi-arrows-expand-vertical"></i> Manual Horizontal Position
+              </button>
+            </div>
+
+            <!-- Manual Slider -->
+            <div id="manualXContainer" style="display: none;" class="p-2.5 rounded-2 bg-dark">
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Left (0%)</span>
+                <span>Center (50%)</span>
+                <span>Right (100%)</span>
+              </div>
+              <input type="range" id="manualXSlider" class="editor-range" min="0" max="1" step="0.02" value="0.5">
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE: SUBTITLES -->
+        <div id="pane_subtitles" class="tool-prop-pane" style="display: none;">
+          <div class="prop-section mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <span class="prop-section-title mb-0">Burned Subtitles</span>
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="subtitlesToggle" checked>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="text-xs text-muted font-bold d-block mb-1">Style</label>
+                <select id="subStyleSelect" class="editor-input">
+                  <option value="bold">Bold Impact</option>
+                  <option value="clean">Clean Minimal</option>
+                  <option value="minimal">Minimal Flat</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="text-xs text-muted font-bold d-block mb-1">Position</label>
+                <select id="subPosSelect" class="editor-input">
+                  <option value="bottom">Bottom (12%)</option>
+                  <option value="center">Center</option>
+                  <option value="top">Top (10%)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="text-xs text-muted font-bold d-block mb-1">Font Family</label>
+                <select id="subFontSelect" class="editor-input">
+                  <option value="Arial">Arial</option>
+                  <option value="Montserrat">Montserrat</option>
+                  <option value="Impact">Impact</option>
+                  <option value="Helvetica">Helvetica</option>
+                  <option value="Verdana">Verdana</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="text-xs text-muted font-bold d-block mb-1">Font Size</label>
+                <input type="number" id="subFontSize" class="editor-input" min="16" max="96" value="48">
+              </div>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between pt-1">
+              <label class="text-xs text-muted font-bold">Text Color</label>
+              <input type="color" id="subColorInput" class="form-control form-control-color p-0 bg-transparent border-0" value="#FFFFFF" style="width: 32px; height: 32px;">
+            </div>
+
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="subBoldToggle" checked>
+              <label class="form-check-label text-xs text-white font-bold" for="subBoldToggle">Bold Typography</label>
+            </div>
+            
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" id="subEmojisToggle">
+              <label class="form-check-label text-xs text-white font-bold" for="subEmojisToggle">Auto Contextual Emojis (🔥 🚀)</label>
+            </div>
+          </div>
+
+          <!-- Subtitle Segments List -->
+          <div class="prop-section">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="prop-section-title mb-0">Dialogue Segments</span>
+              <button type="button" class="btn btn-sm btn-link text-purple text-xs p-0 text-decoration-none font-bold" onclick="window.addSubtitle()">
+                <i class="bi bi-plus-circle me-1"></i> Add
+              </button>
+            </div>
+            <div id="subtitlesItemsList" class="subtitles-list"></div>
+          </div>
+        </div>
+
+        <!-- PANE: OVERLAYS (TEXT & EMOJI) -->
+        <div id="pane_overlays" class="tool-prop-pane" style="display: none;">
+          <div class="prop-section mb-3">
+            <div class="prop-section-title">Add Overlay</div>
+            <div class="d-flex gap-2 mb-3">
+              <button type="button" class="editor-btn-secondary flex-grow-1 justify-content-center py-2 text-xs font-bold" onclick="window.addTextOverlay()">
+                <i class="bi bi-type text-purple me-1"></i> Add Text
+              </button>
+            </div>
+
+            <!-- Quick Emoji Buttons -->
+            <label class="text-xs text-muted font-bold d-block mb-1">Quick Emojis</label>
+            <div class="d-flex flex-wrap gap-1.5 p-2 rounded-2 bg-dark">
+              {% for emo in ['🔥', '🤯', '💰', '🏆', '🚀', '⚡', '👀', '💡', '⚠️', '💯', '❤️', '😂'] %}
+              <button type="button" class="btn btn-sm btn-outline-secondary p-1" style="font-size: 1.15rem; width: 36px; height: 36px;" onclick="window.addEmojiOverlay('{{ emo }}')">
+                {{ emo }}
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Active Overlays List -->
+          <div class="prop-section">
+            <div class="prop-section-title">Active Overlays</div>
+            <div id="overlaysItemsList" class="subtitles-list"></div>
+          </div>
+        </div>
+
+        <!-- PANE: AUDIO & MUSIC -->
+        <div id="pane_audio" class="tool-prop-pane" style="display: none;">
+          <div class="prop-section mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="prop-section-title mb-0">Original Speech Audio</span>
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="origAudioToggle" checked>
+              </div>
+            </div>
+            <div class="mb-2">
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Original Volume</span>
+                <span class="text-white font-bold">0% - 200%</span>
+              </div>
+              <input type="range" id="origVolumeSlider" class="editor-range" min="0" max="2" step="0.05" value="1.0">
+            </div>
+          </div>
+
+          <div class="prop-section mb-3">
+            <div class="prop-section-title">Background Music Track</div>
+            <label class="editor-btn-secondary w-100 justify-content-center py-2.5 mb-2 cursor-pointer text-xs font-bold" for="bgmFileInput">
+              <i class="bi bi-music-note-list text-purple me-1.5"></i> <span id="bgmFileLabel">Choose Audio File (.mp3, .wav)</span>
+            </label>
+            <input type="file" id="bgmFileInput" accept="audio/*" style="display: none;">
+
+            <div class="mb-2">
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Music Volume</span>
+                <span class="text-white font-bold">0% - 100%</span>
+              </div>
+              <input type="range" id="bgmVolumeSlider" class="editor-range" min="0" max="1" step="0.02" value="0.3">
+            </div>
+          </div>
+
+          <div class="prop-section">
+            <div class="prop-section-title">Audio Transitions</div>
+            <div class="mb-2">
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Fade In (sec)</span>
+              </div>
+              <input type="range" id="fadeInSlider" class="editor-range" min="0" max="3" step="0.2" value="0.0">
+            </div>
+            <div>
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Fade Out (sec)</span>
+              </div>
+              <input type="range" id="fadeOutSlider" class="editor-range" min="0" max="3" step="0.2" value="0.0">
+            </div>
+          </div>
+        </div>
+
+        <!-- PANE: PLAYBACK SPEED -->
+        <div id="pane_speed" class="tool-prop-pane" style="display: none;">
+          <div class="prop-section">
+            <div class="prop-section-title">Output Speed Multiplier</div>
+            <div class="d-flex flex-column gap-2">
+              <button type="button" class="editor-btn-secondary speed-btn justify-content-center py-2 font-bold" data-speed="0.5">0.5x (Slow-Motion)</button>
+              <button type="button" class="editor-btn-secondary speed-btn justify-content-center py-2 font-bold" data-speed="0.75">0.75x</button>
+              <button type="button" class="editor-btn-secondary speed-btn active justify-content-center py-2 font-bold" data-speed="1.0">1.0x (Standard Normal)</button>
+              <button type="button" class="editor-btn-secondary speed-btn justify-content-center py-2 font-bold" data-speed="1.25">1.25x (Fast-Paced)</button>
+              <button type="button" class="editor-btn-secondary speed-btn justify-content-center py-2 font-bold" data-speed="1.5">1.5x</button>
+              <button type="button" class="editor-btn-secondary speed-btn justify-content-center py-2 font-bold" data-speed="2.0">2.0x (Hyperlapse)</button>
+            </div>
+            <div class="text-xs text-muted text-center mt-3">Pitch-corrected FFmpeg audio synchronization maintained.</div>
+          </div>
+        </div>
+
+        <!-- PANE: VISUAL ADJUSTMENTS & FILTERS -->
+        <div id="pane_adjustments" class="tool-prop-pane" style="display: none;">
+          <div class="prop-section mb-3">
+            <div class="prop-section-title">Visual Adjustments</div>
+            <div class="mb-3">
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Brightness</span>
+              </div>
+              <input type="range" id="brightSlider" class="editor-range" min="-0.5" max="0.5" step="0.02" value="0">
+            </div>
+            <div class="mb-3">
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Contrast</span>
+              </div>
+              <input type="range" id="contrastSlider" class="editor-range" min="0.5" max="1.8" step="0.05" value="1.0">
+            </div>
+            <div class="mb-2">
+              <div class="d-flex justify-content-between text-xs text-muted mb-1">
+                <span>Saturation</span>
+              </div>
+              <input type="range" id="saturateSlider" class="editor-range" min="0.2" max="2.0" step="0.05" value="1.0">
+            </div>
+          </div>
+
+          <div class="prop-section">
+            <div class="prop-section-title">Color Filter Presets</div>
+            <div class="filter-presets-grid">
+              <button type="button" class="filter-preset-btn active" data-preset="normal">Normal</button>
+              <button type="button" class="filter-preset-btn" data-preset="vivid">Vivid</button>
+              <button type="button" class="filter-preset-btn" data-preset="warm">Warm</button>
+              <button type="button" class="filter-preset-btn" data-preset="cool">Cool</button>
+              <button type="button" class="filter-preset-btn" data-preset="dramatic">Dramatic</button>
+              <button type="button" class="filter-preset-btn" data-preset="bw">B &amp; W</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- BOTTOM TIMELINE                            -->
+  <!-- ========================================== -->
+  <footer class="editor-timeline">
+    
+    <!-- Timeline Toolbar -->
+    <div class="timeline-toolbar">
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-xs font-bold text-white"><i class="bi bi-clock-history text-purple me-1"></i> Multi-Track Timeline</span>
+        <button type="button" id="zoomOutBtn" class="editor-btn-icon" style="width: 26px; height: 26px;" title="Zoom Out">
+          <i class="bi bi-dash"></i>
+        </button>
+        <button type="button" id="zoomInBtn" class="editor-btn-icon" style="width: 26px; height: 26px;" title="Zoom In">
+          <i class="bi bi-plus"></i>
+        </button>
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <span class="text-xs text-muted font-semibold">Tip: Drag edge handles to trim • Drag anywhere on ruler to seek</span>
+      </div>
+    </div>
+
+    <!-- Timeline Scroll Area -->
+    <div id="timelineScroll" class="timeline-scroll-area">
+      <div class="timeline-content-wrapper">
+        
+        <!-- Time Ruler -->
+        <div id="timelineRuler" class="timeline-ruler"></div>
+
+        <!-- Red Playhead Scrubber -->
+        <div id="timelinePlayhead" class="timeline-playhead">
+          <div class="playhead-head"></div>
+        </div>
+
+        <!-- Tracks Container -->
+        <div class="timeline-tracks">
+          
+          <!-- Track 1: Video Segment with Trim Handles -->
+          <div class="timeline-track-lane">
+            <div id="videoClipTrack" class="timeline-video-clip">
+              <div id="trimHandleLeft" class="timeline-trim-handle" title="Drag to adjust Start Time"></div>
+              <span class="text-xs font-bold text-white px-2 text-truncate">
+                <i class="bi bi-film me-1"></i> {{ project.get('reel_filename', 'Video') }}
+              </span>
+              <div id="trimHandleRight" class="timeline-trim-handle" title="Drag to adjust End Time"></div>
+            </div>
+          </div>
+
+          <!-- Track 2: Subtitles Lane -->
+          <div id="subTrackLane" class="timeline-track-lane" style="height: 28px;"></div>
+
+          <!-- Track 3: Overlays Lane -->
+          <div id="overlayTrackLane" class="timeline-track-lane" style="height: 28px;"></div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </footer>
+
+  <!-- ========================================== -->
+  <!-- EXPORT & RENDERING MODAL                   -->
+  <!-- ========================================== -->
+  <div id="exportModal" class="editor-modal-backdrop" style="display: none;">
+    <div class="export-modal-card">
+      
+      <!-- In-Progress State -->
+      <div id="exportProgressSection">
+        <div class="logo-icon mx-auto mb-3" style="width: 50px; height: 50px; font-size: 1.5rem;">
+          <i class="bi bi-magic"></i>
+        </div>
+        <h3 class="font-extrabold text-xl text-white mb-1">Rendering Final Video</h3>
+        <p class="text-xs text-muted mb-3">Processing H.264 video with custom crops, filters, typography and mixed audio.</p>
+
+        <div class="export-progress-track">
+          <div id="exportProgressBar" class="export-progress-bar" style="width: 15%;"></div>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between text-xs text-muted mb-4">
+          <span id="exportProgressStatus" class="font-bold text-white">Initializing FFmpeg pipeline...</span>
+          <span id="exportProgressPercent" class="font-bold text-purple">15%</span>
+        </div>
+
+        <button type="button" class="editor-btn-secondary py-2 px-4" onclick="closeExportModal()">
+          Cancel / Hide
+        </button>
+      </div>
+
+      <!-- Completed State -->
+      <div id="exportCompleteSection" style="display: none;">
+        <div class="d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-pill mb-3" style="background: rgba(16, 185, 129, 0.15); color: #34D399; font-weight: 700; font-size: 0.85rem;">
+          <i class="bi bi-check-circle-fill"></i> Render Complete!
+        </div>
+        <h3 class="font-extrabold text-xl text-white mb-1">Your Short is Ready to Download</h3>
+        <p class="text-xs text-muted mb-2">High-Definition MP4 encoded with your exact adjustments.</p>
+
+        <!-- Final Video Player Preview -->
+        <div class="export-complete-preview">
+          <video id="exportFinalPlayer" controls playsinline loop style="width: 100%; height: 100%; object-fit: contain;"></video>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-center gap-3 text-xs text-muted mb-4">
+          <span>Size: <strong id="exportFileSize" class="text-white">0 MB</strong></span>
+          <span>&bull;</span>
+          <span>Codec: <strong class="text-white">H.264 / AAC</strong></span>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-center">
+          <a id="exportDownloadBtn" href="#" download class="editor-btn-primary py-2.5 px-4 text-xs font-extrabold shadow-purple">
+            <i class="bi bi-download me-1.5"></i> Download Final MP4
+          </a>
+          <button type="button" class="editor-btn-secondary py-2.5 px-4 text-xs font-bold" onclick="closeExportModal()">
+            Continue Editing
+          </button>
+          <a href="{{ url_for('result', job_id=job_id) }}" class="editor-btn-secondary py-2.5 px-3 text-xs font-bold">
+            Back to Results
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Injected Configuration for editor.js -->
+  <script>
+    window.EDITOR_CONFIG = {
+      jobId: "{{ job_id }}",
+      clipId: "{{ clip_id }}",
+      mediaUrl: "{{ media_url }}",
+      initialProject: {{ project|tojson }}
+    };
+  </script>
+
+  <!-- Editor Frontend Controller -->
+  <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
+</body>
+</html>

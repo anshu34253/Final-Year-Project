@@ -66,7 +66,7 @@ def run_pipeline(
 
         job_tag = job_id or f"yt_{uuid.uuid4().hex[:8]}"
         yt_dir = os.path.join("data", "youtube_downloads", job_tag)
-        yt_info = download_youtube_video(youtube_url, output_dir=yt_dir)
+        yt_info = download_youtube_video(youtube_url, output_dir=yt_dir, stage_callback=stage_callback)
         video_path = yt_info["video_path"]
         youtube_metadata = yt_info
         print(f"  -> Acquired YouTube video: '{yt_info['title']}' ({yt_info['duration']}s)")
@@ -369,6 +369,11 @@ def run_multi_reel_pipeline(
     reel_length: str = "30-60",
     aspect_ratio: str = "9:16",
     captions: bool = True,
+    crop_mode: str = "smart",
+    manual_x: float = 0.5,
+    subtitle_style: str = "bold",
+    subtitle_position: str = "bottom",
+    emojis: bool = False,
     output_dir: str = None,
     whisper_model_name: str = "base",
     stage_callback: callable = None,
@@ -406,10 +411,13 @@ def run_multi_reel_pipeline(
 
         job_tag = job_id or f"yt_{uuid.uuid4().hex[:8]}"
         yt_dir = os.path.join("data", "youtube_downloads", job_tag)
-        yt_info = download_youtube_video(youtube_url, output_dir=yt_dir)
+        yt_info = download_youtube_video(youtube_url, output_dir=yt_dir, stage_callback=stage_callback)
         video_path = yt_info["video_path"]
         youtube_metadata = yt_info
         print(f"  -> Acquired YouTube video: '{yt_info['title']}' ({yt_info['duration']}s)")
+    else:
+        if stage_callback:
+            stage_callback("Processing uploaded video file...")
 
     if not video_path or not os.path.isfile(video_path):
         raise FileNotFoundError(f"Input video not found: {video_path}")
@@ -422,9 +430,9 @@ def run_multi_reel_pipeline(
         output_dir = os.path.join("web_outputs", job_tag)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Stage 2: Fast video analysis
+    # Stage 2: Fast video analysis (ResNet-50)
     if stage_callback:
-        stage_callback("Fast video analysis...")
+        stage_callback("Fast video analysis (ResNet-50)...")
     print("\n[Stage 2] Fast visual pre-screening with ResNet-50...")
     from src.fast_visual_screener import FastVisualScreener
     screener = FastVisualScreener(baseline_model_path="models/best_bilstm.pt")
@@ -435,9 +443,9 @@ def run_multi_reel_pipeline(
     seg_times = vis_res["segment_times"]
     print(f"  -> Video duration: {video_dur:.1f}s | Visual segments: {len(seg_times)}")
 
-    # Stage 3: Detecting speech activity
+    # Stage 3: Detecting speech activity (RMS Energy)
     if stage_callback:
-        stage_callback("Detecting speech activity...")
+        stage_callback("Detecting speech activity (RMS Energy)...")
     print("\n[Stage 3] Fast speech activity detection (RMS energy)...")
     from src.audio_pre_screener import extract_audio_fast, detect_speech_intervals
     temp_wav_path = os.path.join("data", "youtube_downloads", job_tag, "audio_16k.wav")
@@ -467,11 +475,11 @@ def run_multi_reel_pipeline(
     )
     print(f"  -> Generated {len(candidates)} candidate windows.")
 
-    # Stage 5: Transcribing selected moments
+    # Stage 5: Transcribing selected moments (faster-whisper)
     if stage_callback:
-        stage_callback("Transcribing selected moments...")
+        stage_callback("Transcribing selected moments (faster-whisper)...")
     print("\n[Stage 5] Transcribing candidate windows with faster-whisper...")
-    if has_speech and os.path.isfile(temp_wav_path) and model_mode == "multimodal":
+    if has_speech and os.path.isfile(temp_wav_path):
         from src.fast_transcriber import transcribe_candidate_windows
         candidates = transcribe_candidate_windows(
             wav_path=temp_wav_path,
@@ -485,9 +493,18 @@ def run_multi_reel_pipeline(
             cand["full_text"] = ""
             cand["has_speech"] = False
 
-    # Stage 6: Understanding candidate speech & Stage 7: Ranking important moments & Stage 8: Creating multiple reels
+    # Stage 6: Understanding candidate speech (MiniLM)
     if stage_callback:
-        stage_callback("Understanding candidate speech...")
+        stage_callback("Understanding candidate speech (MiniLM)...")
+
+    # Stage 7: Ranking important moments (Bi-LSTM)
+    if stage_callback:
+        stage_callback("Ranking important moments (Bi-LSTM)...")
+
+    # Stage 8: Creating multiple reels (Sentence-snapping & NMS)
+    if stage_callback:
+        stage_callback("Creating multiple reels (Sentence-snapping & NMS)...")
+
     print("\n[Stage 6 & 7 & 8] Scoring candidates with Multimodal BiLSTM and creating reels...")
     from src.reel_selector import select_multiple_reels
     selected_reels = select_multiple_reels(
@@ -502,10 +519,10 @@ def run_multi_reel_pipeline(
     )
     print(f"  -> Selected {len(selected_reels)} diverse, high-scoring Reels.")
 
-    # Stage 9: Converting to 9:16 & Stage 10: Adding captions & Stage 11: Finalizing reels
+    # Stage 9: Converting to 9:16 (Smart Face Crop) & Stage 10: Adding captions & Stage 11: Finalizing reels
     if stage_callback:
-        stage_callback("Converting to 9:16...")
-    print("\n[Stage 9, 10 & 11] Rendering Reels in 9:16 with captions...")
+        stage_callback("Converting to 9:16 (Smart Face Crop & Captions)...")
+    print(f"\n[Stage 9, 10 & 11] Rendering Reels in 9:16 (Crop: {crop_mode}, Captions: {captions}, Emojis: {emojis})...")
     from src.reel_renderer import render_multiple_reels
     manifest = render_multiple_reels(
         source_video_path=video_path,
@@ -513,6 +530,11 @@ def run_multi_reel_pipeline(
         output_dir=output_dir,
         aspect_ratio=aspect_ratio,
         captions=captions,
+        crop_mode=crop_mode,
+        manual_x=manual_x,
+        subtitle_style=subtitle_style,
+        subtitle_position=subtitle_position,
+        emojis=emojis,
         stage_callback=stage_callback
     )
 
@@ -526,12 +548,18 @@ def run_multi_reel_pipeline(
     results = {
         "output_mode": "reels",
         "video_filename": video_filename,
+        "source_video_path": os.path.abspath(video_path),
         "original_duration": round(video_dur, 1),
         "num_reels": len(manifest["reels"]),
         "reels": manifest["reels"],
         "manifest_path": os.path.join(output_dir, "manifest.json"),
         "aspect_ratio": aspect_ratio,
         "captions": captions,
+        "crop_mode": crop_mode,
+        "manual_x": manual_x,
+        "subtitle_style": subtitle_style,
+        "subtitle_position": subtitle_position,
+        "emojis": emojis,
         "has_speech": has_speech,
         "model_mode": model_mode,
         "youtube_meta": youtube_metadata,
@@ -555,6 +583,11 @@ if __name__ == "__main__":
     parser.add_argument("--num-reels", type=str, default="auto", choices=["auto", "3", "5", "10"], help="Number of reels")
     parser.add_argument("--reel-length", type=str, default="30-60", choices=["15-30", "30-60", "60-90", "auto"], help="Target reel length")
     parser.add_argument("--aspect-ratio", type=str, default="9:16", choices=["9:16", "16:9"], help="Output aspect ratio")
+    parser.add_argument("--crop-mode", type=str, default="smart", choices=["smart", "center", "manual"], help="Crop mode")
+    parser.add_argument("--manual-x", type=float, default=0.5, help="Manual crop horizontal offset ratio (0.0 to 1.0)")
+    parser.add_argument("--subtitle-style", type=str, default="bold", choices=["bold", "clean", "minimal"], help="Subtitle style")
+    parser.add_argument("--subtitle-position", type=str, default="bottom", choices=["bottom", "center", "top"], help="Subtitle vertical position")
+    parser.add_argument("--emojis", action="store_true", help="Enable contextual emoji generation in captions")
     parser.add_argument("--no-captions", action="store_true", help="Disable burned-in captions")
     parser.add_argument("--output", type=str, default=None, help="Output path / directory")
     parser.add_argument("--plot", type=str, default=None, help="Output score plot path")
@@ -570,6 +603,11 @@ if __name__ == "__main__":
             reel_length=args.reel_length,
             aspect_ratio=args.aspect_ratio,
             captions=not args.no_captions,
+            crop_mode=args.crop_mode,
+            manual_x=args.manual_x,
+            subtitle_style=args.subtitle_style,
+            subtitle_position=args.subtitle_position,
+            emojis=args.emojis,
             output_dir=args.output,
             whisper_model_name=args.whisper_model
         )

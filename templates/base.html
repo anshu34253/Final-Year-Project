@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ViralShort AI - Transform Long Videos into Viral Shorts Automatically{% endblock %}</title>
+  <meta name="description" content="ViralShort AI automatically detects the most engaging viral moments in long videos and converts them into high-converting 9:16 vertical shorts with styled subtitles in seconds.">
+  <meta name="keywords" content="AI Video Shorts, YouTube Short Generator, Viral AI Clip Detection, TikTok Video Converter, OpenAI Whisper Subtitles, Auto Crop 9:16">
+
+  <!-- Google Fonts: Inter & Poppins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+  <!-- Bootstrap Icons (Local Self-Hosted) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.min.css') }}">
+
+  <!-- Custom Core Stylesheets -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Sticky Glassmorphic Navbar -->
+  <nav class="navbar-custom">
+    <div class="container-custom nav-wrapper">
+      <!-- Left: Brand Logo -->
+      <a href="{{ url_for('index') }}" class="logo-brand">
+        <div class="logo-icon">
+          <i class="bi bi-sparkles"></i>
+        </div>
+        <span>Viral<span class="gradient-text">Short AI</span></span>
+      </a>
+
+      <!-- Center: Navigation Links -->
+      <ul class="nav-menu">
+        <li><a href="{{ url_for('index') }}#features" class="nav-link">Features</a></li>
+        <li><a href="{{ url_for('index') }}#workflow" class="nav-link">Workflow</a></li>
+        <li><a href="{{ url_for('index') }}#pipeline" class="nav-link">Technology</a></li>
+        <li><a href="{{ url_for('about') }}" class="nav-link">About</a></li>
+        <li><a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a></li>
+      </ul>
+
+      <!-- Right: Action CTA Buttons & GPU Badge -->
+      <div class="nav-actions">
+        <span class="gpu-badge d-none d-md-inline-flex">
+          <span class="pulse-dot-green"></span> GPU Accelerated
+        </span>
+        <a href="{{ url_for('upload') }}" class="btn-primary-purple">
+          <i class="bi bi-magic"></i> Create Shorts
+        </a>
+        <button class="mobile-toggle-btn" aria-label="Toggle navigation menu">
+          <i class="bi bi-list"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main View Content Injection -->
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="container-custom" style="padding-top: 6rem;">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer Section -->
+  <footer class="footer-custom">
+    <div class="container-custom">
+      <div class="footer-grid">
+        <!-- Brand Summary -->
+        <div>
+          <a href="{{ url_for('index') }}" class="logo-brand mb-3">
+            <div class="logo-icon">
+              <i class="bi bi-sparkles"></i>
+            </div>
+            <span>Viral<span class="gradient-text">Short AI</span></span>
+          </a>
+          <p class="footer-brand-desc">
+            Transform long-form podcasts, webinars, and YouTube videos into high-engagement viral 9:16 vertical shorts automatically powered by state-of-the-art AI vision and speech models.
+          </p>
+        </div>
+
+        <!-- Quick Links -->
+        <div>
+          <h4 class="footer-title">Product</h4>
+          <ul class="footer-links">
+            <li><a href="{{ url_for('upload') }}">Upload Video</a></li>
+            <li><a href="{{ url_for('index') }}#features">AI Features</a></li>
+            <li><a href="{{ url_for('index') }}#pipeline">AI Pipeline</a></li>
+            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+          </ul>
+        </div>
+
+        <!-- Resources -->
+        <div>
+          <h4 class="footer-title">Resources</h4>
+          <ul class="footer-links">
+            <li><a href="https://github.com" target="_blank">GitHub Repository</a></li>
+            <li><a href="{{ url_for('about') }}">Documentation</a></li>
+            <li><a href="{{ url_for('about') }}">API Reference</a></li>
+            <li><a href="{{ url_for('about') }}">Architecture Whitepaper</a></li>
+          </ul>
+        </div>
+
+        <!-- Company & Contact -->
+        <div>
+          <h4 class="footer-title">Company</h4>
+          <ul class="footer-links">
+            <li><a href="{{ url_for('about') }}">About ViralShort AI</a></li>
+            <li><a href="{{ url_for('about') }}">Research Blog</a></li>
+            <li><a href="mailto:support@viralshortai.com">Contact Support</a></li>
+            <li><a href="#">Privacy Policy & Terms</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Footer Bottom -->
+      <div class="footer-bottom">
+        <p>&copy; 2026 ViralShort AI Inc. All rights reserved. Designed for high-converting viral shorts.</p>
+        <div class="social-icons">
+          <a href="https://github.com" class="social-icon" aria-label="GitHub"><i class="bi bi-github"></i></a>
+          <a href="https://twitter.com" class="social-icon" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
+          <a href="https://youtube.com" class="social-icon" aria-label="YouTube"><i class="bi bi-youtube"></i></a>
+          <a href="https://discord.com" class="social-icon" aria-label="Discord"><i class="bi bi-discord"></i></a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Core JavaScript Bundles -->
+  <script src="{{ url_for('static', filename='js/main.js') }}?v=3.1"></script>
+  <script src="{{ url_for('static', filename='js/animation.js') }}?v=3.1"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Video - ViralShort AI{% endblock %}
+
+{% block extra_head %}
+<style>
+  .upload-wrapper-section {
+    padding: 8.5rem 0 6rem 0;
+  }
+
+  .upload-header-box {
+    text-align: center;
+    max-width: 720px;
+    margin: 0 auto 3rem auto;
+  }
+
+  .upload-pill-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 1rem;
+    background: rgba(108, 76, 241, 0.07);
+    border: 1px solid rgba(123, 92, 255, 0.22);
+    border-radius: var(--radius-full);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--primary-purple);
+    margin-bottom: 1.25rem;
+  }
+
+  .upload-main-card {
+    background: white;
+    border-radius: 28px;
+    padding: 3rem;
+    border: 1px solid var(--border-light);
+    box-shadow: var(--shadow-lg);
+    max-width: 860px;
+    margin: 0 auto 3rem auto;
+  }
+
+  /* YouTube Input Bar */
+  .yt-input-pill-bar {
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--border-light);
+    border-radius: var(--radius-full);
+    padding: 0.4rem 0.5rem 0.4rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: var(--transition-normal);
+  }
+
+  .yt-input-pill-bar:focus-within, .yt-input-pill-bar:hover {
+    border-color: var(--primary-purple);
+    background: white;
+    box-shadow: 0 0 0 4px rgba(108, 76, 241, 0.08);
+  }
+
+  .yt-input-field {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 0.95rem;
+    font-family: var(--font-body);
+    color: var(--text-dark);
+  }
+
+  .yt-input-field::placeholder {
+    color: var(--text-light);
+  }
+
+  /* Divider */
+  .upload-or-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    margin: 2rem 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .upload-or-divider::before,
+  .upload-or-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-light);
+  }
+
+  /* Drag Drop Zone */
+  .upload-drop-zone {
+    border: 2px dashed rgba(123, 92, 255, 0.35);
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    text-align: center;
+    background: rgba(108, 76, 241, 0.02);
+    transition: var(--transition-normal);
+    cursor: pointer;
+  }
+
+  .upload-drop-zone:hover, .upload-drop-zone.drag-active {
+    background: rgba(108, 76, 241, 0.05);
+    border-color: var(--primary-purple);
+    transform: translateY(-2px);
+  }
+
+  .drop-icon-bg {
+    width: 60px;
+    height: 60px;
+    background: rgba(108, 76, 241, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem auto;
+    color: var(--primary-purple);
+    font-size: 1.6rem;
+    transition: var(--transition-normal);
+  }
+
+  .upload-drop-zone:hover .drop-icon-bg {
+    background: var(--purple-gradient);
+    color: white;
+    box-shadow: var(--shadow-purple);
+  }
+
+  /* Preset Selector Section */
+  .custom-select-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-top: 1rem;
+  }
+
+  .custom-select-box label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 0.4rem;
+    display: block;
+  }
+
+  .custom-select-field {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+    font-size: 0.88rem;
+    font-family: var(--font-body);
+    color: var(--text-dark);
+    background: var(--bg-secondary);
+    outline: none;
+    transition: var(--transition-fast);
+  }
+
+  .custom-select-field:focus {
+    border-color: var(--primary-purple);
+    background: white;
+  }
+
+  /* Bottom Micro Feature Cards */
+  .upload-features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .micro-feature-card {
+    background: white;
+    border-radius: 18px;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .micro-feature-icon {
+    width: 42px;
+    height: 42px;
+    background: rgba(108, 76, 241, 0.08);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-purple);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 768px) {
+    .custom-select-grid { grid-template-columns: 1fr; }
+    .upload-features-grid { grid-template-columns: 1fr; }
+    .upload-main-card { padding: 1.75rem 1.25rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="upload-wrapper-section">
+  <div class="container-custom">
+    
+    <!-- Upload Page Header -->
+    <div class="upload-header-box">
+      <span class="upload-pill-badge">
+        <i class="bi bi-cloud-arrow-up-fill me-1"></i> AI Video Input Pipeline
+      </span>
+      <h1 class="font-extrabold text-4xl mb-2">Upload Long Video or Paste URL</h1>
+      <p class="upload-sub">Paste a YouTube link or drop an MP4 file to automatically extract viral 9:16 shorts.</p>
+    </div>
+
+    <!-- Main Upload Card -->
+    <div class="hero-saas-card shadow-glow" style="max-width: 900px;">
+      
+      <!-- Option 1: YouTube URL Input Bar -->
+      <form action="{{ url_for('upload') }}" method="POST" id="url-upload-form">
+        <input type="hidden" name="upload_type" value="youtube">
+        <input type="hidden" name="output_mode" value="reels">
+
+        <label class="form-label font-bold text-sm mb-2 text-white">
+          <i class="bi bi-youtube text-danger me-1"></i> Paste YouTube Video URL
+        </label>
+
+        <!-- Integrated Large URL Input Bar & Primary CTA Button -->
+        <div class="yt-input-hero-group mb-4">
+          <div class="yt-input-inner">
+            <i class="bi bi-link-45deg input-link-icon"></i>
+            <input type="url" name="youtube_url" id="youtube-url-input" class="yt-hero-field" placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=...)" required>
+            <button type="button" id="remove-url-btn" class="btn-clear-url" style="display: none;">
+              Clear <i class="bi bi-x-circle-fill ms-1"></i>
+            </button>
+          </div>
+          
+          <button type="submit" id="download-btn" class="btn-primary-cta">
+            <span class="btn-cta-text">✨ Generate Shorts</span>
+            <i class="bi bi-arrow-right-short fs-4 ms-1"></i>
+          </button>
+        </div>
+      </form>
+
+      <!-- OR Divider -->
+      <div class="upload-or-divider text-muted text-xs my-4 text-center" style="letter-spacing: 0.08em;">
+        &mdash; OR DRAG &amp; DROP FILE BELOW &mdash;
+      </div>
+
+      <!-- Option 2: Drag & Drop Zone Form -->
+      <form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data" id="file-upload-form">
+        <input type="hidden" name="upload_type" value="file">
+        <input type="hidden" name="output_mode" value="reels">
+        
+        <div id="drop-zone" class="saas-drop-zone" onclick="document.getElementById('file-upload-input').click();">
+          <div class="saas-drop-icon">
+            <i class="bi bi-cloud-arrow-up-fill"></i>
+          </div>
+          <h3 class="saas-drop-title">Drag and Drop video file here</h3>
+          <p class="saas-drop-sub">Supports MP4 files up to 500MB</p>
+          <input type="file" name="video_file" id="file-upload-input" accept="video/mp4" style="display: none;" onchange="this.form.submit()">
+        </div>
+
+        <!-- GENERATION SETTINGS CARDS SECTION -->
+        <div class="settings-section-container mt-4">
+          <div class="settings-header">
+            <span class="settings-title"><i class="bi bi-sliders text-purple me-1.5"></i> Generation Settings</span>
+          </div>
+
+          <div class="settings-cards-grid">
+            <!-- Shorts Count -->
+            <div class="setting-card">
+              <div class="setting-card-icon"><i class="bi bi-collection-play-fill text-purple"></i></div>
+              <div class="setting-card-body">
+                <label class="setting-card-label">Shorts Count</label>
+                <select name="num_reels" class="setting-custom-select">
+                  <option value="1">1 Short</option>
+                  <option value="2">2 Shorts</option>
+                  <option value="3" selected>3 Shorts (Recommended)</option>
+                  <option value="4">4 Shorts</option>
+                  <option value="5">5 Shorts</option>
+                  <option value="6">6 Shorts</option>
+                  <option value="7">7 Shorts</option>
+                  <option value="8">8 Shorts</option>
+                  <option value="9">9 Shorts</option>
+                  <option value="10">10 Shorts</option>
+                  <option value="15">15 Shorts</option>
+                  <option value="auto">Auto (Match Video)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Target Duration -->
+            <div class="setting-card">
+              <div class="setting-card-icon"><i class="bi bi-clock-history text-purple"></i></div>
+              <div class="setting-card-body">
+                <label class="setting-card-label">Target Duration</label>
+                <select name="reel_length" class="setting-custom-select">
+                  <option value="30-60" selected>Auto (30s - 60s)</option>
+                  <option value="15-30">Punchy (15s - 30s)</option>
+                  <option value="60-90">Deep (60s - 90s)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Subtitles -->
+            <div class="setting-card">
+              <div class="setting-card-icon"><i class="bi bi-subtitles-fill text-purple"></i></div>
+              <div class="setting-card-body">
+                <label class="setting-card-label">Subtitles</label>
+                <select name="captions" class="setting-custom-select">
+                  <option value="on" selected>🔥 Burned-in Subtitles (ON)</option>
+                  <option value="off">✨ Clean Video (OFF)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Aspect Ratio -->
+            <div class="setting-card">
+              <div class="setting-card-icon"><i class="bi bi-aspect-ratio-fill text-purple"></i></div>
+              <div class="setting-card-body">
+                <label class="setting-card-label">Aspect Ratio</label>
+                <select name="aspect_ratio" class="setting-custom-select">
+                  <option value="9:16" selected>📱 9:16 Vertical Shorts</option>
+                  <option value="16:9">💻 16:9 Landscape Summary</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+
+    </div>
+
+    <!-- 3 Bottom Feature Badges -->
+    <div class="upload-features-grid">
+      <div class="micro-feature-card text-center center-flex-col">
+        <div class="micro-feature-icon mx-auto"><i class="bi bi-lightning-charge-fill text-warning"></i></div>
+        <div class="text-center">
+          <div class="font-bold text-sm">30s GPU Speed</div>
+          <div class="text-xs text-muted">Accelerated rendering</div>
+        </div>
+      </div>
+
+      <div class="micro-feature-card text-center center-flex-col">
+        <div class="micro-feature-icon mx-auto"><i class="bi bi-crosshair text-purple"></i></div>
+        <div class="text-center">
+          <div class="font-bold text-sm">95% Accuracy</div>
+          <div class="text-xs text-muted">XGBoost viral peak model</div>
+        </div>
+      </div>
+
+      <div class="micro-feature-card text-center center-flex-col">
+        <div class="micro-feature-icon mx-auto"><i class="bi bi-person-bounding-box text-info"></i></div>
+        <div class="text-center">
+          <div class="font-bold text-sm">Auto Face Framing</div>
+          <div class="text-xs text-muted">MediaPipe 9:16 tracking</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

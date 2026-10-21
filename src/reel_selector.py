@@ -184,7 +184,9 @@ def select_multiple_reels(
         t_min, t_max = 30.0, 60.0
 
     # Determine desired count
-    if num_reels_option in ["3", "5", "10"]:
+    if str(num_reels_option).isdigit():
+        max_desired = max(1, int(num_reels_option))
+    elif num_reels_option in ["3", "5", "10"]:
         max_desired = int(num_reels_option)
     else:
         # Auto heuristic based on video duration
@@ -197,7 +199,7 @@ def select_multiple_reels(
         else:                          # 40+ min
             max_desired = 12
 
-    logger.info(f"Scoring {len(candidates)} candidates with Multimodal BiLSTM...")
+    logger.info(f"Scoring {len(candidates)} candidates with Multimodal BiLSTM (Target Reels: {max_desired})...")
 
     # Score each candidate
     scored_candidates = []
@@ -213,10 +215,10 @@ def select_multiple_reels(
 
     # Filter below quality threshold
     passing = [c for c in scored_candidates if c["final_score"] >= quality_threshold]
-    if len(passing) < 2 and scored_candidates:
-        # If very few pass, take top 2 to avoid empty results
+    if len(passing) < max_desired and scored_candidates:
+        # Take top candidates up to max_desired
         scored_candidates.sort(key=lambda x: x["final_score"], reverse=True)
-        passing = scored_candidates[:max(1, min(len(scored_candidates), 2))]
+        passing = scored_candidates[:max(1, min(len(scored_candidates), max_desired))]
 
     # Sort descending by score
     passing.sort(key=lambda x: x["final_score"], reverse=True)
@@ -229,21 +231,18 @@ def select_multiple_reels(
         inter_end = min(e1, e2)
         return max(0.0, inter_end - inter_start)
 
+    # Pass 1: Strict NMS
     for cand in passing:
         c_start, c_end = cand["start"], cand["end"]
-
-        # Check overlap against already selected reels
         too_close = False
         for s in selected:
             inter = compute_overlap_sec(c_start, c_end, s["start_sec"], s["end_sec"])
-            # If overlap > 12s or IoU > 0.3, suppress
             cand_dur = c_end - c_start
             if inter > 12.0 or (inter / cand_dur) > 0.30:
                 too_close = True
                 break
 
         if not too_close:
-            # Snap start & end to sentence boundaries
             snapped_s, snapped_e, snippet = snap_boundaries_to_sentences(
                 raw_start=c_start,
                 raw_end=c_end,
@@ -251,7 +250,6 @@ def select_multiple_reels(
                 target_min=t_min,
                 target_max=t_max
             )
-            # Ensure within video bounds
             snapped_s = max(0.0, snapped_s)
             snapped_e = min(video_duration, snapped_e)
             reel_dur = round(snapped_e - snapped_s, 2)
@@ -268,6 +266,38 @@ def select_multiple_reels(
 
         if len(selected) >= max_desired:
             break
+
+    # Pass 2: If we still need more reels to fulfill max_desired, relax overlap threshold
+    if len(selected) < max_desired and len(passing) > len(selected):
+        for cand in passing:
+            if len(selected) >= max_desired:
+                break
+            c_start, c_end = cand["start"], cand["end"]
+            already_included = False
+            for s in selected:
+                if abs(s["start_sec"] - c_start) < 4.0:
+                    already_included = True
+                    break
+            if not already_included:
+                snapped_s, snapped_e, snippet = snap_boundaries_to_sentences(
+                    raw_start=c_start,
+                    raw_end=c_end,
+                    speech_segments=cand.get("segments", []),
+                    target_min=t_min,
+                    target_max=t_max
+                )
+                snapped_s = max(0.0, snapped_s)
+                snapped_e = min(video_duration, snapped_e)
+                reel_dur = round(snapped_e - snapped_s, 2)
+                if reel_dur >= 10.0:
+                    selected.append({
+                        "start_sec": snapped_s,
+                        "end_sec": snapped_e,
+                        "duration_sec": reel_dur,
+                        "score": cand["final_score"],
+                        "transcript": snippet or cand.get("full_text", ""),
+                        "speech_segments": cand.get("segments", [])
+                    })
 
     # Sort selected reels chronologically for clean presentation
     selected.sort(key=lambda x: x["start_sec"])

@@ -24,15 +24,26 @@ An end-to-end Machine Learning and Computer Vision system that takes long-form v
    - Temporal **Non-Maximum Suppression (NMS)** prevents repetitive moments.
    - **Sentence-Boundary Snapping** avoids cutting speech mid-sentence.
    - Target duration constraints (15–30s, 30–60s, 60–90s).
-5. **Automated Vertical 9:16 Video Rendering**:
-   - FFmpeg center-crop conversion to `1080x1920` 9:16 vertical format.
-   - Burned-in, high-contrast styled captions with automatic subtitle time-shifting.
-6. **Modern Flask Web Interface**:
-   - Real-time 11-stage background progress tracking.
+5. **Smart 9:16 Crop & Subject Tracking**:
+   - UniFace SCRFD (500M KPS) + ByteTrack for dynamic speaker tracking.
+   - Exponential Moving Average (EMA) temporal smoothing prevents sudden camera jumps.
+   - Robust fallback to center crop on frames/clips where no face is present.
+   - Manual crop slider option (0.0 to 1.0 horizontal pan).
+6. **Advanced Subtitle & Contextual Emoji Service**:
+   - SubStation Alpha (`.ass`) rendering with customizable typography styles (`bold`, `clean`, `minimal`).
+   - Flexible vertical placement (`bottom`, `center`, `top`) with automatic line wrapping.
+   - Transcript-aware contextual emojis (e.g., 🔥, 😲, 💰, 🏆, 🚀) linked to spoken keywords without random spam.
+7. **Interactive In-Browser Manual Editor**:
+   - Visual 9:16 player modal with live start/end trimming and scrub controls.
+   - Fine-tune crop position, switch subtitle styles/positions, and toggle emojis.
+   - **Zero-Inference Re-rendering**: Re-renders only the edited clip in seconds without re-running expensive ResNet-50 visual feature extraction or Bi-LSTM scoring.
+8. **Modern Flask Web Interface**:
+   - Real-time background progress tracking.
    - In-browser HTML5 video players for every generated reel with transcripts and importance scores.
-   - Individual reel downloads and a **one-click ZIP download bundle** (`/download_all/<job_id>`).
-7. **Windows UTF-8 & Charmap Safe**:
+   - Individual reel editing, downloads, and a **one-click ZIP download bundle** (`/download_all/<job_id>`).
+9. **Windows UTF-8 & Charmap Safe**:
    - Comprehensive character encodings handling emoji and non-ASCII titles (e.g., `😰 🎬 ✅`) without crashing on Windows.
+
 
 ---
 
@@ -231,6 +242,10 @@ FinalYearProject/
 │   ├── text_embedder.py        # MiniLM-L6-v2 384-D sentence embeddings
 │   ├── reel_selector.py        # Multimodal Bi-LSTM scoring & temporal NMS
 │   ├── reel_renderer.py        # FFmpeg 9:16 crop & burned-in captions
+│   ├── face_tracking.py        # UniFace SCRFD + ByteTrack 9:16 dynamic tracking
+│   ├── crop_strategy.py        # Smart, center, and manual 9:16 crop strategies
+│   ├── subtitle_service.py     # SubStation Alpha styled & positioned captions
+│   ├── emoji_service.py        # Transcript-aware contextual emoji enhancement
 │   ├── youtube_downloader.py   # Safe yt-dlp acquisition and validation
 │   ├── utf8_utils.py           # Windows UTF-8 and codepage safety utilities
 │   ├── lstm_model.py           # Baseline PyTorch Bi-LSTM architecture
@@ -239,14 +254,15 @@ FinalYearProject/
 │
 ├── templates/                  # HTML5 Jinja2 web templates
 │   ├── index.html              # Landing page with multi-reel controls
-│   ├── processing.html         # Live 11-stage progress tracker
-│   └── result.html             # Multi-reel grid preview & ZIP download
+│   ├── processing.html         # Live progress tracker
+│   └── result.html             # Multi-reel grid preview & interactive editor modal
 │
 ├── static/                     # Web UI styling & interactions
 │   ├── css/style.css           # Modern dark-theme responsive design
 │   └── js/script.js            # Live status polling & dynamic toggles
 │
 ├── tests/                      # Automated unit & integration test suites
+│   ├── test_integrated_features.py # 18 tests for face tracking, subtitles, emojis, editor
 │   ├── test_phase13_multireel.py
 │   ├── test_utf8_encoding.py
 │   └── test_flask_app.py
